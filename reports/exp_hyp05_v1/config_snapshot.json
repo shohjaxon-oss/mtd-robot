@@ -1,0 +1,14 @@
+{
+  "saved_at_utc": "2026-10-13T11:57:44.827709+00:00",
+  "config": {
+    "exp_id": "HYP05_V1",
+    "hypo_id": "HYP-05",
+    "params": {
+      "entry_period": 20,
+      "exit_period": 10,
+      "atr_sl_mult": 2.0,
+      "rr_ratio": 2.5
+    },
+    "timeframe": "H4"
+  }
+}

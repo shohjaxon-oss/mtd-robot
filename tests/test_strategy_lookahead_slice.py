@@ -9,8 +9,11 @@ import numpy as np
 import pandas as pd
 import pytest
 
+from python_brain.signals.donchian_trend import DonchianTrendStrategy
+from python_brain.signals.intraday_breakout import IntradayNoOvernightStrategy
 from python_brain.signals.mean_reversion import MeanReversionStrategy
 from python_brain.signals.session_breakout import SessionBreakoutStrategy
+from python_brain.signals.short_only_pullback import ShortOnlyTrendPullbackStrategy
 from python_brain.signals.trend_pullback import TrendPullbackStrategy
 from python_brain.signals.volatility_squeeze import VolatilitySqueezeStrategy
 
@@ -47,6 +50,9 @@ def _generate_synthetic_candles(n: int = 500) -> pd.DataFrame:
         VolatilitySqueezeStrategy(),
         TrendPullbackStrategy(),
         MeanReversionStrategy(),
+        DonchianTrendStrategy(),
+        IntradayNoOvernightStrategy(),
+        ShortOnlyTrendPullbackStrategy(),
     ],
 )
 def test_strategy_lookahead_slice(strategy_instance):

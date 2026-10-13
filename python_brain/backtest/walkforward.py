@@ -37,6 +37,18 @@ class WindowResult:
     is_metrics: Dict[str, Any]
     oos_metrics: Dict[str, Any]
     wfo_efficiency: float  # OOS Sharpe / IS Sharpe
+    best_params: Dict[str, Any] | None = None
+
+
+@dataclass
+class WalkForwardAnalysisResult:
+    window_results: List[WindowResult]
+    combined_oos_metrics: Dict[str, Any]
+    profitable_windows_pct: float
+    total_oos_trades: int
+    combined_oos_pf: float
+    combined_oos_sharpe: float
+    combined_oos_max_dd: float
 
 
 class WalkForwardSplitter:
@@ -130,13 +142,15 @@ class WalkForwardAnalyzer:
     def run(
         self,
         df: pd.DataFrame,
-        strategy_factory: Callable[[], Strategy],
+        strategy_factory: Callable[..., Strategy],
         engine_factory: Callable[[], BacktestEngine],
-    ) -> List[WindowResult]:
+        param_grid: List[Dict[str, Any]] | None = None,
+    ) -> WalkForwardAnalysisResult:
         windows = self.splitter.generate_windows(df)
         results: List[WindowResult] = []
 
         time_series = df.index if isinstance(df.index, pd.DatetimeIndex) else pd.to_datetime(df["time_utc"])
+        all_oos_positions = []
 
         for w in windows:
             mask_is = (time_series >= w.is_start) & (time_series <= w.is_end)
@@ -145,19 +159,42 @@ class WalkForwardAnalyzer:
             is_df = df[mask_is].copy()
             oos_df = df[mask_oos].copy()
 
-            # In-Sample
-            strat_is = strategy_factory()
-            engine_is = engine_factory()
-            res_is = engine_is.run(is_df, strat_is)
-            metrics_is = calculate_metrics(res_is)
+            # Nested In-Sample Parameter Selection (R2-4)
+            best_p = None
+            best_is_metric = -999999.0
+            best_is_acc = None
+            best_is_metrics = {}
 
-            # Out-of-Sample
-            strat_oos = strategy_factory()
-            engine_oos = engine_factory()
-            res_oos = engine_oos.run(oos_df, strat_oos)
+            if param_grid and len(param_grid) > 0:
+                for p in param_grid:
+                    eng = engine_factory()
+                    strat = strategy_factory(**p)
+                    acc = eng.run(is_df, strat)
+                    m = calculate_metrics(acc)
+                    # IS saralash mezoni: Profit Factor (agar trades >= 10 bo'lsa)
+                    score = m.get("profit_factor", 0.0) if m.get("total_trades", 0) >= 10 else 0.0
+                    if score > best_is_metric:
+                        best_is_metric = score
+                        best_p = p
+                        best_is_acc = acc
+                        best_is_metrics = m
+            else:
+                best_p = {}
+                eng = engine_factory()
+                strat = strategy_factory()
+                best_is_acc = eng.run(is_df, strat)
+                best_is_metrics = calculate_metrics(best_is_acc)
+
+            # Out-of-Sample evaluation using best parameter from IS
+            eng_oos = engine_factory()
+            strat_oos = strategy_factory(**best_p) if best_p else strategy_factory()
+            res_oos = eng_oos.run(oos_df, strat_oos)
             metrics_oos = calculate_metrics(res_oos)
 
-            is_sharpe = metrics_is.get("sharpe_ratio", 0.0)
+            # Accumulate OOS closed trades
+            all_oos_positions.extend(res_oos.closed_positions)
+
+            is_sharpe = best_is_metrics.get("sharpe_ratio", 0.0)
             oos_sharpe = metrics_oos.get("sharpe_ratio", 0.0)
             if abs(is_sharpe) > 1e-4:
                 wfo_eff = oos_sharpe / is_sharpe
@@ -167,10 +204,48 @@ class WalkForwardAnalyzer:
             results.append(
                 WindowResult(
                     window=w,
-                    is_metrics=metrics_is,
+                    is_metrics=best_is_metrics,
                     oos_metrics=metrics_oos,
                     wfo_efficiency=wfo_eff,
+                    best_params=best_p,
                 )
             )
 
-        return results
+        # R2-4: Concatenate ALL OOS trades into single master account for holistic metrics
+        init_bal = 10000.0
+        combined_acc = BacktestEngine(initial_balance=init_bal).run(
+            df.iloc[:2], strategy_factory(**(param_grid[0] if param_grid else {}))
+        )
+        combined_acc.closed_positions = all_oos_positions
+        combined_acc.balance = init_bal + sum(p.realized_pnl for p in all_oos_positions)
+        combined_acc.equity = combined_acc.balance
+
+        # Calculate peak-to-trough on merged OOS curve
+        running_bal = init_bal
+        peak_bal = init_bal
+        max_dd = 0.0
+        for p in all_oos_positions:
+            running_bal += p.realized_pnl
+            if running_bal > peak_bal:
+                peak_bal = running_bal
+            dd = (peak_bal - running_bal) / peak_bal * 100.0
+            if dd > max_dd:
+                max_dd = dd
+        combined_acc.max_equity_drawdown_pct = max_dd
+        combined_acc.max_balance_drawdown_pct = max_dd
+
+        combined_metrics = calculate_metrics(combined_acc)
+
+        # Profitable windows ratio
+        profitable_count = sum(1 for r in results if r.oos_metrics.get("net_profit", 0.0) > 0)
+        prof_pct = (profitable_count / len(results) * 100.0) if results else 0.0
+
+        return WalkForwardAnalysisResult(
+            window_results=results,
+            combined_oos_metrics=combined_metrics,
+            profitable_windows_pct=round(prof_pct, 2),
+            total_oos_trades=len(all_oos_positions),
+            combined_oos_pf=combined_metrics.get("profit_factor", 0.0),
+            combined_oos_sharpe=combined_metrics.get("sharpe_ratio", 0.0),
+            combined_oos_max_dd=round(max_dd, 2),
+        )

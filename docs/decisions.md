@@ -138,5 +138,26 @@ Ushbu hujjatda `mtd-robot` loyihasi bo'yicha qabul qilingan barcha muhim texnik,
 - **Oqibati:**
   Bozor haqiqatiga bo'ysunildi, real kapital asrab qolindi va loyihaning ilmiy integritysi 100% saqlandi.
 
+---
+
+## ADR-0010: 4/10 R2 Audit Tuzatishlari, Xarajat Dekompozitsiyasi va Swap Asimmetriyasi
+- **Sana:** 2026-10-13
+- **Holat:** Qabul qilindi
+- **Kontekst:**
+  4/10 R2 doirasida audit talab qilgan 8 ta muhim vazifa bajarildi:
+  1) `engine.run()` da `stress_multiplier` xatosi tuzatildi (None bo'lmaganda ustidan yozish).
+  2) Xarajat dekompozitsiyasi orqali Gross PF, Net PF, Spread, Slippage, Swap va Komissiya aniq ajratildi.
+  3) Engine ichida ambiguous savdolar (`is_ambiguous_exit`) sanaldi.
+  4) Walk-Forward nested qilinib, barcha OOS savdolari birlashtirildi (concatenated OOS PF).
+  5) Yangi gipotezalar (HYP-05 H4 Donchian, HYP-06 H1 Intraday No-Overnight, HYP-07 Short-Only Pullback) sinovdan o'tkazildi (Jami $N=15 \le 30$).
+- **Asosiy Kashfiyotlar va Qaror:**
+  1. **Long Swap Halokati:** XAUUSD da uzoq muddatli trend-following (HYP-05 H4) sof narxda **Gross PF = 1.17** ga ega! Biroq jami $2,361 xarajatning **78.4% i (-$1,851)** aynan Long Swap foiziga ketgan. Natijada Net PF 0.95 ga tushgan.
+  2. **Ambiguous Trades Haqiqati:** H1 va H4 da bar ichida SL va TP bir vaqtda tegishi nazariy 8-20% emas, balki realda atigi **0.0% – 1.09%** ekanligi isbotlandi. SL-first qoidasi natijalarni buzmagan.
+  3. **Skrining (R2-6):** Gross PF < 1.05 bo'lgan 9 ta variant xarajatdan emas, sof ustunlik yo'qligidan (NO EDGE) darhol rad etildi.
+  4. **Holdout Qulfi:** B4 mezonlaridan o'tgan nomzod topilmagani sababli, holdout (oxirgi 20%) ochilmadi.
+- **Oqibati:**
+  Strategiya tadqiqotining barcha zaif nuqtalari matematik aniqlikda fosh qilindi. Retail MT5 hisobidagi swap cheklovlari va kelgusidagi arxitektura yo'nalishi (kun ichi / swap-free / komissiyali fyucherslar) aniq belgilandi.
+
+
 
 

@@ -113,3 +113,52 @@
 - **Turi:** Diagnostik tadqiqot (Strategiya emas, boshqa gipotezalar uchun filtr manbai).
 - **Mantiq:** Hafta kunlari (Dushanba-Juma) va UTC soatlari (00:00 - 23:00) bo'yicha XAUUSD volatilligi va yo'nalishli qaytimini o'rganish.
 - **Natija:** Qaysi soatlarda savdo qilish qat'iy taqiqlanishi yoki ruxsat etilishi aniqlanadi.
+
+---
+
+# 4/10 R2 BOSQICHIDA QO'SHILGAN YANGI GIPOTEZALAR (2026-10-13)
+> **Pre-registration (Natijalarni ko'rishdan OLDIN ro'yxatga olindi):**
+
+---
+
+## Gipoteza 6: `H4_DONCHIAN_TREND` (H4 Trend-Following)
+- **ID:** `HYP-05`
+- **Timeframe:** H4
+- **Iqtisodiy/Tuzilmaviy Mantiq:**
+  H1 ga qaraganda H4 da o'rtacha sham diapazoni ($15 - $25) ancha katta. Bu spread friksiyasining ($0.24) nisbiy ta'sirini kamaytiradi. Klassik Donchian kanallari (20 bar breakout) orqali yirik institutsional to'lqinlar ushlanadi.
+- **Kirish Qoidalari:**
+  - Close > 20-bar High -> BUY
+  - Close < 20-bar Low -> SELL
+- **Chiqish Qoidalari:**
+  - Stop Loss: $2.0 \times \text{ATR}(14)$
+  - Take Profit: $3.0 \times \text{SL}$ (R:R = 3.0)
+- **Parametrlar:** `entry_period` [20], `atr_sl_mult` [2.0], `rr_ratio` [2.5, 3.0]
+- **Rad Etish Sharti:** Gross PF < 1.05 bo'lsa darhol rad etiladi.
+
+---
+
+## Gipoteza 7: `H1_INTRADAY_NO_OVERNIGHT` (Swap-Free Intraday Breakout)
+- **ID:** `HYP-06`
+- **Timeframe:** H1
+- **Iqtisodiy/Tuzilmaviy Mantiq:**
+  Exness brokerida Long swap (-$52.62/lot/kecha) eng asosiy halokat omili ekanligi isbotlandi. Bu gipoteza barcha savdolarni 20:00 UTC ga qadar (rollover oldidan) yopadi yoki 20:00 dan keyin hech qanday pozitsiya qoldirmaydi.
+- **Kirish Qoidalari:** Osiyo diapazoni yorilishi (07:00 - 10:00 UTC).
+- **Chiqish:** SL $1.5 \times \text{ATR}$, TP $2.0 \times \text{SL}$, va 20:00 UTC time-exit.
+- **Parametrlar:** `entry_window_hours` [3], `rr_ratio` [1.5, 2.0]
+- **Rad Etish Sharti:** Gross PF < 1.05 bo'lsa darhol rad etiladi.
+
+---
+
+## Gipoteza 8: `H1_SHORT_ONLY_PULLBACK` (Short-Only Asimmetrik Pullback)
+- **ID:** `HYP-07` (POST-HOC: HYP-03 natijalaridan kelib chiqqan)
+- **Timeframe:** H1
+- **Iqtisodiy/Tuzilmaviy Mantiq:**
+  Exness MT5 da XAUUSD Short pozitsiyalari 100% SWAP-FREE ($0.00). Oltinda pasayish to'lqinlari panika va marjin-koll tufayli juda tez va impulsli ro'y beradi. Uzoq muddatli ayiq bozorlarida faqat SELL pozitsiyalarni ushlash swap xarajatlaridan to'liq xalos qiladi.
+- **Kirish Qoidalari:**
+  - `Close < EMA200` (Ayiq trendi).
+  - H1 da `Close >= min(EMA20, EMA50)` va `RSI(14) >= 55` (overbought pullback).
+  - Kirish: FAQAT SELL.
+- **Chiqish:** SL $1.5 \times \text{ATR}$, TP $2.0 \times \text{SL}$.
+- **Parametrlar:** `fast_ema` [20], `slow_ema` [50], `rsi_overbought` [50, 55], `rr_ratio` [2.0]
+- **Rad Etish Sharti:** Gross PF < 1.05 bo'lsa darhol rad etiladi.
+

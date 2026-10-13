@@ -98,12 +98,19 @@
 
 ## 4/10 Bosqich: Strategiya Tadqiqoti va Validatsiya Natijalari
 
-- [x] **Pre-registration (`docs/hypotheses.md`):** 4 ta oila (`HYP-01`, `HYP-02`, `HYP-03`, `HYP-04`) va 1 ta diagnostika (`DIAG-01`) natijalarni ko'rishdan oldin ro'yxatga olindi.
-- [x] **Strategiya kodlari:** `python_brain/signals/` ostida `SessionBreakout`, `VolatilitySqueeze`, `TrendPullback`, `MeanReversion` yaratildi.
-- [x] **Lookahead kesish testi:** `tests/test_strategy_lookahead_slice.py` barcha 4 ta strategiyada 0-lookahead ni isbotladi.
-- [x] **Eksperimentlar Jurnali:** `research/experiment_log.csv` ga barcha 9 ta tajriba (Train 80% davrida) qayd etildi.
-- [x] **Gate Natijasi:** Barcha nomzodlar B4 Gate mezonlaridan o'tmadi (PF 0.64 - 0.95). **Edge topilmadi.**
-- [x] **Holdout:** Holdout ochilmadi, ma'lumotlar ifloslanishdan asrab qolindi.
-- [x] **Hujjat:** `docs/strategy_selection.md` da to'liq sabablar va keyingi qadamlar tahlili yozildi.
+- [x] **Pre-registration (`docs/hypotheses.md`):** 7 ta oila (`HYP-01` .. `HYP-07`) va 1 ta diagnostika (`DIAG-01`) natijalarni ko'rishdan oldin ro'yxatga olindi.
+- [x] **Strategiya kodlari:** `SessionBreakout`, `VolatilitySqueeze`, `TrendPullback`, `MeanReversion`, `DonchianTrend`, `IntradayNoOvernight`, `ShortOnlyTrendPullback`.
+- [x] **Lookahead kesish testi:** `tests/test_strategy_lookahead_slice.py` barcha 7 ta strategiyada 0-lookahead ni isbotladi (7/7 yashil).
+- [x] **R2-1 Stress Xatosi Tuzatildi:** 1.5x stress xarajati to'liq amalga oshirildi (`test_r2_1_stress_multiplier_passed_correctly`).
+- [x] **R2-2 Xarajat Dekompozitsiyasi:** Gross PF, Net PF, Spread, Slippage, Swap va Komissiya aniq ajratildi. Long swap HYP-03 da ziyonning 45.7-47.9% ini, HYP-05 H4 da 73.9-78.4% ini tashkil etgani raqamlar bilan fosh qilindi.
+- [x] **R2-3 Ambiguous Trades:** Engine ichida haqiqiy bar to'qnashuvi o'lchandi (atigi 0.0% – 1.09%).
+- [x] **R2-4 Walk-Forward (Nested):** OOS savdolari birlashtirildi, yig'ma OOS PF hisoblandi.
+- [x] **R2-5 Kalendar:** `ExportCalendar.mq5` diagnostikasi kuchaytirildi, `RuleBasedNewsCalendar` zaxira generatori yaratildi.
+- [x] **R2-6 Skrining:** Gross PF < 1.05 bo'lgan 9 ta variant "NO EDGE" deb belgilandi.
+- [x] **Eksperimentlar Jurnali:** `research/experiment_log.csv` ga barcha $N=15$ ta tajriba to'liq qayd etildi.
+- [x] **Gate Natijasi:** Barcha 15 ta nomzod B4 Gate mezonlaridan o'tmadi. **Edge topilmadi.**
+- [x] **Holdout:** Holdout qat'iy muhrlangan holda qoldi.
+- [x] **Hujjat:** `docs/strategy_selection.md` va `docs/decisions.md` (ADR-0010) to'liq yangilandi.
+
 
 

@@ -1,6 +1,6 @@
 # Backtest Report: `exp_hyp04_v2`
 
-Generated at: 2026-10-13 11:24:45 UTC
+Generated at: 2026-10-13 11:56:44 UTC
 
 ## Asosiy Ko'rsatkichlar
 
@@ -31,14 +31,19 @@ Generated at: 2026-10-13 11:24:45 UTC
 - **O'rtacha davomiylik:** `11.6` soat
 
 ## Izohlar va Qaydlar
-### Gipoteza: HYP-04 (MeanReversion)
+### Gipoteza: HYP-04 (MeanReversion) [R2 Hisoboti]
 
-- **Parametrlar:** `{'bb_period': 20, 'bb_std': 2.5, 'adx_max': 22.0, 'atr_sl_mult': 1.5}`
-- **Baza PF (1.0x):** 0.64 | **Stress PF (1.5x):** 0.64
-- **Long P&L:** $-60.01 (21 trades)
-- **Short P&L:** $-357.73 (30 trades)
-- **Ambiguous Barlar:** 8.77%
-- **OOS Average PF:** 333.28 | **OOS Sharpe:** -7.14
+- **Parametrlar:** `{'bb_period': 20, 'bb_std': 2.5, 'adx_max': 22.0, 'atr_sl_mult': 1.5}` (Timeframe: `H1`)
+- **Gross PF:** 0.76 | **Net PF:** 0.64 | **Stress 1.5x PF:** 0.63
+- **Xarajatlar Dekompozitsiyasi:**
+  - Jami xarajatlar: $160.69 (20.2% gross profitdan)
+  - Spread: $84.59 | Slippage: $43.13
+  - Swap: $-32.97 (Long swap: $-32.97, Short swap: $0.00)
+  - Komissiya: $0.00
+  - Savdo boshiga o'rtacha xarajat: $3.15 | Cost-to-Edge: 999.00
+- **Ambiguous Savdolar (SL & TP bir barda):** 5.88% (3 ta)
+- **Long P&L:** $-60.01 (21 trades) | **Short P&L:** $-357.73 (30 trades)
+- **Yig'ma OOS PF:** 0.00 | **OOS Sharpe:** 0.00 | **Foydali Oynalar:** 0.0%
 - **Gate Xulosasi:** GATE REJECTED
 
 

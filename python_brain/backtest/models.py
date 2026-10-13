@@ -66,8 +66,10 @@ class Position:
     close_time_utc: Optional[datetime] = None
     exit_reason: Optional[ExitReason] = None
     realized_pnl: float = 0.0
+    gross_pnl: float = 0.0
     slippage_cost: float = 0.0
     spread_cost: float = 0.0
+    is_ambiguous_exit: bool = False
 
 
 @dataclass

@@ -1,0 +1,16 @@
+{
+  "saved_at_utc": "2026-10-13T12:05:07.211770+00:00",
+  "config": {
+    "exp_id": "HYP07_V2",
+    "hypo_id": "HYP-07",
+    "params": {
+      "fast_ema": 20,
+      "slow_ema": 50,
+      "trend_ema": 200,
+      "rsi_overbought": 50.0,
+      "rr_ratio": 2.5,
+      "atr_sl_mult": 2.0
+    },
+    "timeframe": "H1"
+  }
+}

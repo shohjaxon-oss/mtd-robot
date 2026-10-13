@@ -63,7 +63,7 @@ class BacktestEngine:
         strategy: Strategy,
         risk_gate: Optional[RiskGate] = None,
         cost_model: Optional[CostModel] = None,
-        stress_multiplier: float = 1.0,
+        stress_multiplier: Optional[float] = None,
     ) -> AccountState:
         """Execute full event-driven simulation over the provided candle history."""
         if df.empty:
@@ -71,7 +71,8 @@ class BacktestEngine:
 
         gate = risk_gate or DefaultRiskGate()
         costs = cost_model or CostModel(point=self.point, contract_size=self.contract_size)
-        costs.stress_multiplier = stress_multiplier
+        if stress_multiplier is not None:
+            costs.stress_multiplier = stress_multiplier
 
         account = AccountState(
             initial_balance=self.initial_balance,
@@ -205,8 +206,13 @@ class BacktestEngine:
                     hit_sl = bar_low <= pos.sl
                     hit_tp = (pos.tp is not None) and (bar_high >= pos.tp)
 
+                    # R2-3: Ambiguous bar detection (both SL and TP hit in same bar)
+                    if hit_sl and hit_tp:
+                        pos.is_ambiguous_exit = True
+
                     if hit_sl:
                         slip = costs.get_slippage_penalty("BUY", True, spread_price, local_atr)
+                        pos.slippage_cost = round(slip * self.contract_size * pos.volume, 2)
                         # A3: Gap-down protection: fill base is min(SL, bar_open)
                         fill_base = min(pos.sl, bar_open)
                         close_price = fill_base - slip
@@ -226,8 +232,13 @@ class BacktestEngine:
                     hit_sl = ask_high >= pos.sl
                     hit_tp = (pos.tp is not None) and (ask_low <= pos.tp)
 
+                    # R2-3: Ambiguous bar detection
+                    if hit_sl and hit_tp:
+                        pos.is_ambiguous_exit = True
+
                     if hit_sl:
                         slip = costs.get_slippage_penalty("SELL", True, spread_price, local_atr)
+                        pos.slippage_cost = round(slip * self.contract_size * pos.volume, 2)
                         # A3: Gap-up protection: fill base is max(SL, ask_open)
                         fill_base = max(pos.sl, ask_open)
                         close_price = fill_base + slip
@@ -258,6 +269,9 @@ class BacktestEngine:
                         price_diff = pos.open_price - pos.close_price
 
                     gross_pnl = price_diff * self.contract_size * pos.volume
+                    # R2-2: Theoretical Gross P&L before all frictions (spread + slip)
+                    pos.gross_pnl = round(gross_pnl + pos.slippage_cost + pos.spread_cost, 2)
+
                     # A1: Exactly once deduction: gross_pnl + accumulated_swap - commission
                     pos.realized_pnl = round(gross_pnl + pos.accumulated_swap - pos.commission, 2)
 

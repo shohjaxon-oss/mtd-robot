@@ -22,17 +22,34 @@ void OnStart()
    datetime date_to = TimeCurrent();
    MqlCalendarValue values[];
    
+   // Reset error
+   ResetLastError();
+   
    // Request calendar events history from broker server
    int count = CalendarValueHistory(values, InpStartDate, date_to, NULL, InpCurrency);
+   int last_err = GetLastError();
    
    if(count <= 0)
    {
-      PrintFormat("CalendarValueHistory failed or returned 0 events. Error code: %d", GetLastError());
-      Print("Tip: Ensure 'Allow WebRequest' and Calendar are updated in MT5 terminal.");
+      PrintFormat("CalendarValueHistory returned %d records. LastError: %d", count, last_err);
+      if(last_err == 5401) // ERR_CALENDAR_NO_DATA
+         Print("DIAGNOSTIC: Error 5401 (ERR_CALENDAR_NO_DATA) - Broker does not provide historical calendar data for this date range.");
+      else if(last_err == 5400) // ERR_CALENDAR_TIMEOUT
+         Print("DIAGNOSTIC: Error 5400 (ERR_CALENDAR_TIMEOUT) - Request timed out. Terminal is still syncing calendar.");
+      else if(last_err == 4001)
+         Print("DIAGNOSTIC: Unexpected internal parameter error.");
+      else
+         PrintFormat("DIAGNOSTIC: Calendar database may be empty on broker demo server. Terminal connection status: %s",
+            TerminalInfoInteger(TERMINAL_CONNECTED) ? "CONNECTED" : "DISCONNECTED");
+      
+      Print("Tip: Open 'Calendar' tab in MT5 Terminal bottom panel, right-click -> 'Auto Update' to force broker sync.");
       return;
    }
    
-   PrintFormat("Retrieved %d calendar records from MT5. Writing to CSV: %s ...", count, InpFileName);
+   datetime first_time = values[0].time;
+   datetime last_time = values[count - 1].time;
+   PrintFormat("SUCCESS: Retrieved %d calendar records. First event: %s, Last event: %s", 
+      count, TimeToString(first_time, TIME_DATE), TimeToString(last_time, TIME_DATE));
    
    // Open CSV in MT5 Common or local Files directory (MQL5\Files\)
    int file_handle = FileOpen(InpFileName, FILE_WRITE | FILE_CSV | FILE_ANSI, ',');

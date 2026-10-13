@@ -1,0 +1,15 @@
+{
+  "saved_at_utc": "2026-10-13T12:01:03.831246+00:00",
+  "config": {
+    "exp_id": "HYP06_V2",
+    "hypo_id": "HYP-06",
+    "params": {
+      "asian_start_hour": 0,
+      "asian_end_hour": 7,
+      "entry_window_hours": 3,
+      "rr_ratio": 2.0,
+      "atr_sl_mult": 2.0
+    },
+    "timeframe": "H1"
+  }
+}

@@ -241,3 +241,48 @@ def test_a9_news_blackout_spread_and_entry_guard():
     # 12:30 da News blackout tufayli buyruq bloklandi!
     assert len(account.open_positions) == 0
     assert len(account.closed_positions) == 0
+
+
+def test_r2_1_stress_multiplier_passed_correctly():
+    """R2-1 Testi: CostModel(stress_multiplier=1.5) berilsa, engine uni 1.0 ga qaytarib tashlamasligi."""
+    records = [
+        {"time_utc": datetime(2026, 3, 10, 10, 0, tzinfo=timezone.utc), "open": 2000.0, "high": 2005.0, "low": 1995.0, "close": 2001.0, "spread": 200.0},
+        {"time_utc": datetime(2026, 3, 10, 11, 0, tzinfo=timezone.utc), "open": 2001.0, "high": 2010.0, "low": 1998.0, "close": 2005.0, "spread": 200.0},
+    ]
+    df = _make_df(records)
+    sig = Signal(time_utc=df["time_utc"].iloc[0], action="BUY", sl=1980.0)
+    strat = SingleSignalStrategy(step_to_fire=0, signal=sig)
+
+    cost_model = CostModel(stress_multiplier=1.5)
+    engine = BacktestEngine(initial_balance=10000.0)
+    # stress_multiplier uzatilmagan taqdirda ham cost_model ichidagi 1.5 saqlanadi
+    account = engine.run(df, strat, cost_model=cost_model)
+
+    assert cost_model.stress_multiplier == 1.5
+    assert len(account.open_positions) == 1
+    pos = account.open_positions[0]
+    # 200.0 pts * 1.5 stress = 300.0 pts ($0.30)
+    # Buy open_price = bar_open (2001.0) + spread_price (0.30) = 2001.30
+    assert round(pos.open_price, 2) == 2001.30
+
+
+def test_r2_3_ambiguous_exit_flag_detection():
+    """R2-3 Testi: Bir barda ham SL, ham TP tekkanda is_ambiguous_exit bayrog'i rost bo'lishi."""
+    records = [
+        {"time_utc": datetime(2026, 3, 10, 10, 0, tzinfo=timezone.utc), "open": 2000.0, "high": 2005.0, "low": 1995.0, "close": 2001.0, "spread": 0.0},
+        {"time_utc": datetime(2026, 3, 10, 11, 0, tzinfo=timezone.utc), "open": 2001.0, "high": 2002.0, "low": 2000.0, "close": 2001.0, "spread": 0.0},
+        # Katta volatillik: Low 1980 ga tushdi (SL=1990 ga tegdi), High 2030 ga chiqdi (TP=2020 ga tegdi)
+        {"time_utc": datetime(2026, 3, 10, 12, 0, tzinfo=timezone.utc), "open": 2001.0, "high": 2030.0, "low": 1980.0, "close": 2010.0, "spread": 0.0},
+    ]
+    df = _make_df(records)
+    sig = Signal(time_utc=df["time_utc"].iloc[0], action="BUY", sl=1990.0, tp=2020.0)
+    strat = SingleSignalStrategy(step_to_fire=0, signal=sig)
+
+    engine = BacktestEngine(initial_balance=10000.0)
+    account = engine.run(df, strat, cost_model=ZeroCostModel())
+
+    assert len(account.closed_positions) == 1
+    pos = account.closed_positions[0]
+    assert pos.exit_reason == ExitReason.STOP_LOSS  # SL-first qoidasi
+    assert pos.is_ambiguous_exit is True            # Ikkilamchi bar deb belgilandi!
+
