@@ -13,6 +13,16 @@ mt5:
   reconnect_retries: 3
   reconnect_delay_seconds: 5
 
+# ==============================================================================
+# QAT'IY XAVFSIZLIK QOIDASI (LIVE GUARD)
+# allow_live: false - Haqiqiy pul hisobida savdo qilish MUTLAQO TAQIQLANGAN!
+# Faqat 10/10 bosqich to'liq yakunlangach qo'lda yoqiladi.
+# ==============================================================================
+safety:
+  allow_live: false
+  require_demo_trade_mode: true
+  max_allowed_magic_number: 999999
+
 logging:
   level: "INFO"              # DEBUG | INFO | WARNING | ERROR | CRITICAL
   log_to_console: true

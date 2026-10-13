@@ -43,11 +43,16 @@ class BridgeConfig(BaseModel):
     heartbeat_timeout_seconds: float = Field(default=5.0, gt=0.0)
 
 
+class SafetyConfig(BaseModel):
+    allow_live: bool = Field(default=False, description="Strict safety guard: False for Demo only, True for Live")
+
+
 class SettingsConfig(BaseModel):
     app: AppConfig
     mt5: MT5SystemConfig
     logging: LoggingConfig
     bridge: BridgeConfig
+    safety: SafetyConfig = Field(default_factory=SafetyConfig)
 
 
 # --------------------------------------------------------------------------
@@ -123,6 +128,7 @@ class RiskConfig(BaseModel):
     drawdown_limits: DrawdownLimitsConfig
     execution_limits: ExecutionLimitsConfig
     forbidden_mechanics: ForbiddenMechanicsConfig
+    strategy_profiles: dict = Field(default_factory=dict)
 
 
 # --------------------------------------------------------------------------

@@ -15,10 +15,10 @@
 | 2 | **Data layer (Tarixiy ma'lumot, sifat, profil)** | ✅ Yopildi | ✅ O'tdi | M1-D1 ma'lumot Parquet'da, sifat hisoboti, spread modeli |
 | 3 | **Backtest engine va xarajat modeli** | ✅ Yopildi | ✅ O'tdi | Event-driven, A1-A12 audit tuzatishlari, 47/47 test |
 | 4 | **Strategiya tadqiqoti va validatsiya** | ✅ Yopildi | ⚠️ Rad etildi (Halol) | 4 oila sinaldi, xarajatlar ostida edge topilmadi, Holdout qulfda |
-| 5 | Signal engine, rejim aniqlash, yangilik filtri | 🔄 Keyingi | Kutilmoqda | Yangi gipotezalar (intraday/short-bias), rejim detektorlari |
-| 6 | Risk engine (eng muhim modul) | ⏳ Kutilmoqda | - | 0.5% risk, kill-switch, lot hisoblash |
-| 7 | MQL5 EA ijro qatlami va ko'prik | ⏳ Kutilmoqda | - | Terminal ichidagi himoya qalqoni |
-| 8 | Monitoring, logging, ogohlantirish, testlar | ⏳ Kutilmoqda | - | Telegram bot, 48h uzluksiz demo test |
+| 5 | **Signal engine, rejim aniqlash, yangilik filtri** | 🔄 Keyingi | Kutilmoqda | Yangi gipotezalar (intraday/short-bias), rejim detektorlari |
+| 6 | **Risk engine (eng muhim modul)** | ✅ Yopildi (Demo) | ✅ O'tdi | SQLite persistent state, kill-switch reset, 12 ta xavfsizlik cheklovi |
+| 7 | **MQL5 EA ijro qatlami va ko'prik** | ✅ Yopildi (Demo) | ✅ O'tdi | Server SL/TP, idempotentlik, DLL-siz MTD_Guardian.mq5 |
+| 8 | **Monitoring, logging, ogohlantirish, testlar** | ✅ Yopildi (Demo) | ✅ O'tdi | LiveRunner, Telegram, Watchdog, Dry-run, 87/87 test |
 | 9 | Demo forward-test (8-12 hafta) | ⏳ Kutilmoqda | - | Qat'iy parametrlarda real bozor tekshiruvi |
 | 10 | Mikro-live, VPS, masshtablash va operatsiya | ⏳ Kutilmoqda | - | Kichik real kapital, runbook, monitoring |
 
@@ -111,6 +111,44 @@
 - [x] **Gate Natijasi:** Barcha 15 ta nomzod B4 Gate mezonlaridan o'tmadi. **Edge topilmadi.**
 - [x] **Holdout:** Holdout qat'iy muhrlangan holda qoldi.
 - [x] **Hujjat:** `docs/strategy_selection.md` va `docs/decisions.md` (ADR-0010) to'liq yangilandi.
+
+---
+
+## Infratuzilma Bosqichi: 6/10 + 7/10 + 8/10 (Faqat DEMO)
+
+Strategiya tadqiqotidan mustaqil, mustahkam va xavfsiz ijro infratuzilmasi to'liq qurildi:
+
+- [x] **0. Live Guard (Xavfsizlik Qalqoni):**
+  - `python_brain/risk/live_guard.py` yaratildi.
+  - `account.trade_mode == 0` (DEMO) qat'iy tekshiriladi; REAL hisobda darhol `LiveTradingBlockedError` beradi.
+  - `config/settings.yaml` da `safety.allow_live: false` o'rnatildi.
+- [x] **1. Risk Engine (`python_brain/risk/`):**
+  - SQLite persistent state store (`data/state/risk_state.db`): kill-switch, kunlik/haftalik PnL, ketma-ket zararlar va cooldown muddati diskda saqlanadi.
+  - Kill-switch ni qo'lda tiklash: `scripts/reset_kill_switch.py --reason "..." --force`.
+  - `ProductionRiskGate`: 12 ta xavfsizlik cheklovi (0.5% lot risk, margin tekshiruvi, juma kechki yopish, spread filtri, ketma-ket zararlardan keyin 60 daqiqa cooldown).
+- [x] **2. MT5 Ijro Qatlami (`python_brain/execution/`):**
+  - `MT5BrokerExecutor`: Server darajasidagi majburiy Stop-Loss va Take-Profit (hech qanday pozitsiya SL siz ketmaydi).
+  - Magic number `10101`, max deviation (slippage) 30-50 punkt.
+  - Idempotentlik: shu magic/comment bilan ochiq order bo'lsa dublikat ochilishidan 100% himoya.
+  - Ishga tushishda broker bilan holat sinxronizatsiyasi (`reconcile_open_positions`).
+  - Retcode'lar ishlovi (requote, off quotes, no money, market closed, timeout) va qayta urinish (retry).
+- [x] **3. Live Runner (`python_brain/main.py`):**
+  - Faqat **yangi yopilgan M15 barlarda** ishlaydi (intrabar tick shovqinidan xoli).
+  - Broker vaqt drifti tekshiruvi (ogohlantirish).
+  - Graceful shutdown: dastur to'xtaganda brokerdagi pozitsiyalar server SL/TP bilan xavfsiz qoladi.
+- [x] **4. Qo'riqchi EA (`mql5_ea/MTD_Guardian.mq5`):**
+  - Tashqi DLL siz, sof MQL5.
+  - Python `FILE_COMMON` katalogidagi `mtd_heartbeat.json` ni kuzatadi (30s timeout eskirsa Safe Mode).
+  - Kunlik equity yo'qotishi 3.0% ga yetsa, barcha pozitsiyalarni brokerda majburiy yopadi va yangi savdoni bloklaydi.
+- [x] **5. Monitoring va Watchdog:**
+  - `python_brain/monitoring/telegram_notifier.py`: Standart `urllib` orqali xavfsiz Telegram ogohlantirishlari.
+  - `scripts/watchdog.py`: LiveRunner qulasa avtomatik qayta tiriltirish va Telegram xabarnomasi.
+- [x] **6. Quvur Sinov Strategiyasi:**
+  - `python_brain/signals/pipeline_test.py`: "FOYDA UCHUN EMAS, FAQAT QUVUR SINOVI" (0.01 lot, ATR SL/TP, faqat demo).
+- [x] **7. Testlar va Dry-Run:**
+  - Mock MT5 bilan ulanish uzilishi, barcha retcode'lar, dublikatlar, reconciliation, kill-switch reset, heartbeat testlandi.
+  - `scripts/demo_dry_run.py`: Demo hisobda 0.01 lot savdoni ochib, server SL/TP tekshirib, yopuvchi sinov skripti.
+  - Jami testlar: **87/87 test 100% yashil** (`pytest`).
 
 
 

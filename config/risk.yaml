@@ -29,3 +29,10 @@ forbidden_mechanics:
   allow_martingale: false
   allow_grid: false
   allow_averaging_down: false
+
+# Strategiya profillari bo'yicha maxsus parametrlar (ADR-0013)
+strategy_profiles:
+  fu_formation:
+    min_risk_reward_ratio: 0.5   # FU da dinamik SL (FU wick + 5 pip) bo'lgani sababli R:R < 1.5 bo'lishi mumkin
+    fixed_lot_per_leg: 0.01      # Qat'iy 0.01 + 0.01 lot
+    max_open_setups: 1           # Bir vaqtda faqat 1 ta setup

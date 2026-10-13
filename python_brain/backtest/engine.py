@@ -168,25 +168,57 @@ class BacktestEngine:
                     )
 
                     if approved_order is not None:
-                        commission = costs.calculate_commission(approved_order.volume)
-                        # A1: Do NOT deduct commission from account.balance here!
-                        # It will be cleanly deducted upon position closure.
+                        if pending_signal.legs and len(pending_signal.legs) > 0:
+                            # Multi-leg setup execution
+                            group_id = pending_signal.group_id or f"GRP_{current_ticket}"
+                            pip_size = getattr(pending_signal, "pip_size_price", 0.10)
+                            for leg in pending_signal.legs:
+                                if leg.tp is not None:
+                                    leg_tp = leg.tp
+                                elif leg.tp_pips is not None:
+                                    leg_tp = round(
+                                        exec_price + (leg.tp_pips * pip_size) if is_buy else exec_price - (leg.tp_pips * pip_size),
+                                        3,
+                                    )
+                                else:
+                                    leg_tp = None
 
-                        pos = Position(
-                            ticket=current_ticket,
-                            symbol="XAUUSDm",
-                            side=approved_order.side,
-                            volume=approved_order.volume,
-                            open_price=round(exec_price, 3),
-                            open_time_utc=bar_time,
-                            sl=approved_order.sl,
-                            tp=approved_order.tp,
-                            comment=approved_order.comment,
-                            commission=commission,
-                            spread_cost=spread_price * self.contract_size * approved_order.volume,
-                        )
-                        current_ticket += 1
-                        account.open_positions.append(pos)
+                                pos = Position(
+                                    ticket=current_ticket,
+                                    symbol="XAUUSDm",
+                                    side=approved_order.side,
+                                    volume=leg.volume,
+                                    open_price=round(exec_price, 3),
+                                    open_time_utc=bar_time,
+                                    sl=approved_order.sl,
+                                    tp=leg_tp,
+                                    comment=f"{approved_order.comment}|{leg.leg_id}" if leg.leg_id else approved_order.comment,
+                                    commission=costs.calculate_commission(leg.volume),
+                                    spread_cost=spread_price * self.contract_size * leg.volume,
+                                    group_id=group_id,
+                                    leg_id=leg.leg_id,
+                                    breakeven_on_first_tp=pending_signal.breakeven_on_first_tp,
+                                    original_sl=approved_order.sl,
+                                )
+                                current_ticket += 1
+                                account.open_positions.append(pos)
+                        else:
+                            commission = costs.calculate_commission(approved_order.volume)
+                            pos = Position(
+                                ticket=current_ticket,
+                                symbol="XAUUSDm",
+                                side=approved_order.side,
+                                volume=approved_order.volume,
+                                open_price=round(exec_price, 3),
+                                open_time_utc=bar_time,
+                                sl=approved_order.sl,
+                                tp=approved_order.tp,
+                                comment=approved_order.comment,
+                                commission=commission,
+                                spread_cost=spread_price * self.contract_size * approved_order.volume,
+                            )
+                            current_ticket += 1
+                            account.open_positions.append(pos)
 
                     pending_signal = None  # Consumed
 
@@ -195,36 +227,123 @@ class BacktestEngine:
             # -------------------------------------------------------------
             active_positions: List[Position] = []
 
-            for pos in account.open_positions:
+            def finalize_close(p: Position, c_price: float, exit_r: ExitReason):
+                p.is_closed = True
+                p.close_price = round(c_price, 3)
+                p.close_time_utc = bar_time
+                p.exit_reason = exit_r
+
+                if p.side == OrderSide.BUY:
+                    price_diff = p.close_price - p.open_price
+                else:
+                    price_diff = p.open_price - p.close_price
+
+                gross_pnl = price_diff * self.contract_size * p.volume
+                p.gross_pnl = round(gross_pnl + p.slippage_cost + p.spread_cost, 2)
+                p.realized_pnl = round(gross_pnl + p.accumulated_swap - p.commission, 2)
+
+                account.balance += p.realized_pnl
+                account.daily_realized_pnl += p.realized_pnl
+                account.weekly_realized_pnl += p.realized_pnl
+                account.closed_positions.append(p)
+
+            # Separate multi-leg groups vs standalone positions
+            groups: Dict[str, List[Position]] = {}
+            standalone: List[Position] = []
+            for p in account.open_positions:
+                if p.group_id and p.breakeven_on_first_tp:
+                    groups.setdefault(p.group_id, []).append(p)
+                else:
+                    standalone.append(p)
+
+            # Evaluate multi-leg groups
+            for gid, legs in groups.items():
+                legs.sort(key=lambda x: x.leg_id or "")
+                # Both Leg A and Leg B open
+                if len(legs) >= 2:
+                    leg_a, leg_b = legs[0], legs[1]
+                    is_buy = leg_a.side == OrderSide.BUY
+
+                    ask_open = bar_open + spread_price
+                    ask_high = bar_high + spread_price
+                    ask_low = bar_low + spread_price
+
+                    if is_buy:
+                        hit_initial_sl = bar_low <= leg_a.sl
+                        hit_tp_a = (leg_a.tp is not None) and (bar_high >= leg_a.tp)
+                        hit_tp_b = (leg_b.tp is not None) and (bar_high >= leg_b.tp)
+                    else:
+                        hit_initial_sl = ask_high >= leg_a.sl
+                        hit_tp_a = (leg_a.tp is not None) and (ask_low <= leg_a.tp)
+                        hit_tp_b = (leg_b.tp is not None) and (ask_low <= leg_b.tp)
+
+                    # (iv) Boshlang'ich SL tegsa, ikkala leg ham SL da yopiladi
+                    if hit_initial_sl:
+                        for leg in [leg_a, leg_b]:
+                            if hit_tp_a or hit_tp_b:
+                                leg.is_ambiguous_exit = True
+                            slip = costs.get_slippage_penalty(leg.side.value, True, spread_price, local_atr)
+                            leg.slippage_cost = round(slip * self.contract_size * leg.volume, 2)
+                            fill_base = min(leg.sl, bar_open) if is_buy else max(leg.sl, ask_open)
+                            c_price = fill_base - slip if is_buy else fill_base + slip
+                            finalize_close(leg, c_price, ExitReason.STOP_LOSS)
+                    elif hit_tp_a:
+                        # Leg A TP da yopiladi
+                        finalize_close(leg_a, leg_a.tp, ExitReason.TAKE_PROFIT)
+
+                        # (iii) Bitta barda TP_A va TP_B ikkalasiga tegsa
+                        if hit_tp_b:
+                            retraced = (bar_low <= leg_b.open_price) if is_buy else (ask_high >= leg_b.open_price)
+                            if retraced:
+                                # B breakeven da yopilgan hisoblanadi va setup ambiguous bo'ladi
+                                slip = costs.get_slippage_penalty(leg_b.side.value, True, spread_price, local_atr)
+                                leg_b.slippage_cost = round(slip * self.contract_size * leg_b.volume, 2)
+                                fill_base = min(leg_b.open_price, bar_open) if is_buy else max(leg_b.open_price, ask_open)
+                                c_price = fill_base - slip if is_buy else fill_base + slip
+                                leg_b.is_ambiguous_exit = True
+                                finalize_close(leg_b, c_price, ExitReason.STOP_LOSS)
+                            else:
+                                finalize_close(leg_b, leg_b.tp, ExitReason.TAKE_PROFIT)
+                        else:
+                            # (ii) Breakeven SL keyingi bardan kuchga kiradi
+                            leg_b.sl = leg_b.open_price
+                            leg_b.breakeven_activated = True
+                            active_positions.append(leg_b)
+                    else:
+                        # Neither initial SL nor TP_A hit
+                        active_positions.append(leg_a)
+                        active_positions.append(leg_b)
+
+                elif len(legs) == 1:
+                    # Only one leg remaining (Leg B with BE active)
+                    standalone.append(legs[0])
+
+            # Evaluate standalone positions (and remaining single legs)
+            for pos in standalone:
                 is_closed = False
                 close_price = 0.0
                 reason = None
 
                 if pos.side == OrderSide.BUY:
-                    # Buy SL/TP are triggered by Bid price
-                    # Conservatism rule: Check SL first!
                     hit_sl = bar_low <= pos.sl
                     hit_tp = (pos.tp is not None) and (bar_high >= pos.tp)
 
-                    # R2-3: Ambiguous bar detection (both SL and TP hit in same bar)
                     if hit_sl and hit_tp:
                         pos.is_ambiguous_exit = True
 
                     if hit_sl:
                         slip = costs.get_slippage_penalty("BUY", True, spread_price, local_atr)
                         pos.slippage_cost = round(slip * self.contract_size * pos.volume, 2)
-                        # A3: Gap-down protection: fill base is min(SL, bar_open)
                         fill_base = min(pos.sl, bar_open)
                         close_price = fill_base - slip
                         reason = ExitReason.STOP_LOSS
                         is_closed = True
                     elif hit_tp:
-                        close_price = pos.tp  # TP limit executed without adverse slip
+                        close_price = pos.tp
                         reason = ExitReason.TAKE_PROFIT
                         is_closed = True
 
                 else:  # SELL Position
-                    # Sell SL/TP are triggered by Ask price = Bid + Spread
                     ask_open = bar_open + spread_price
                     ask_high = bar_high + spread_price
                     ask_low = bar_low + spread_price
@@ -232,14 +351,12 @@ class BacktestEngine:
                     hit_sl = ask_high >= pos.sl
                     hit_tp = (pos.tp is not None) and (ask_low <= pos.tp)
 
-                    # R2-3: Ambiguous bar detection
                     if hit_sl and hit_tp:
                         pos.is_ambiguous_exit = True
 
                     if hit_sl:
                         slip = costs.get_slippage_penalty("SELL", True, spread_price, local_atr)
                         pos.slippage_cost = round(slip * self.contract_size * pos.volume, 2)
-                        # A3: Gap-up protection: fill base is max(SL, ask_open)
                         fill_base = max(pos.sl, ask_open)
                         close_price = fill_base + slip
                         reason = ExitReason.STOP_LOSS
@@ -249,50 +366,27 @@ class BacktestEngine:
                         reason = ExitReason.TAKE_PROFIT
                         is_closed = True
 
-                # A1 & A7: Overnight Swap calculation (accumulates if position held past 00:00 UTC)
-                # Swap is accumulated into pos.accumulated_swap ONLY.
-                # account.balance is NOT modified here to prevent double-deduction.
-                if not is_closed and bar_time.hour == 0 and bar_time.minute == 0:
+                if is_closed:
+                    finalize_close(pos, close_price, reason)
+                else:
+                    active_positions.append(pos)
+
+            # Update swap & mark-to-market valuation for all remaining active positions
+            for pos in active_positions:
+                if bar_time.hour == 0 and bar_time.minute == 0:
                     swap_cost = costs.calculate_swap(pos.side.value, pos.volume, bar_time)
                     pos.accumulated_swap += swap_cost
 
-                if is_closed:
-                    pos.is_closed = True
-                    pos.close_price = round(close_price, 3)
-                    pos.close_time_utc = bar_time
-                    pos.exit_reason = reason
+                current_bid = bar_close
+                current_ask = bar_close + spread_price
+                pos.current_price = current_bid if pos.side == OrderSide.BUY else current_ask
 
-                    # Calculate Realized P&L
-                    if pos.side == OrderSide.BUY:
-                        price_diff = pos.close_price - pos.open_price
-                    else:
-                        price_diff = pos.open_price - pos.close_price
-
-                    gross_pnl = price_diff * self.contract_size * pos.volume
-                    # R2-2: Theoretical Gross P&L before all frictions (spread + slip)
-                    pos.gross_pnl = round(gross_pnl + pos.slippage_cost + pos.spread_cost, 2)
-
-                    # A1: Exactly once deduction: gross_pnl + accumulated_swap - commission
-                    pos.realized_pnl = round(gross_pnl + pos.accumulated_swap - pos.commission, 2)
-
-                    account.balance += pos.realized_pnl
-                    account.daily_realized_pnl += pos.realized_pnl
-                    account.weekly_realized_pnl += pos.realized_pnl
-                    account.closed_positions.append(pos)
+                if pos.side == OrderSide.BUY:
+                    unrealized = (current_bid - pos.open_price) * self.contract_size * pos.volume
                 else:
-                    # Update mark-to-market valuation
-                    current_bid = bar_close
-                    current_ask = bar_close + spread_price
-                    pos.current_price = current_bid if pos.side == OrderSide.BUY else current_ask
+                    unrealized = (pos.open_price - current_ask) * self.contract_size * pos.volume
 
-                    if pos.side == OrderSide.BUY:
-                        unrealized = (current_bid - pos.open_price) * self.contract_size * pos.volume
-                    else:
-                        unrealized = (pos.open_price - current_ask) * self.contract_size * pos.volume
-
-                    # A1: Floating unrealized includes swap and commission
-                    pos.unrealized_pnl = unrealized + pos.accumulated_swap - pos.commission
-                    active_positions.append(pos)
+                pos.unrealized_pnl = unrealized + pos.accumulated_swap - pos.commission
 
             account.open_positions = active_positions
 

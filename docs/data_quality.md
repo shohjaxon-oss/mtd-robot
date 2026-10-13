@@ -48,3 +48,9 @@
 - Found 1 unexpected intra-week data gaps.
 - Found 16 extreme price spikes exceeding 6.0x ATR.
 
+### Timeframe: M3 (Resampled from M1 & Native Broker M3)
+- **M3 Resampled (`data/raw/XAUUSDm/M3/`):** 33,388 bars, 2026-07-01 dan 2026-10-12 gacha. M1 barlaridan UTC ga tekislangan (:00, :03, :06, ...) resample qilingan.
+  - Open = first M1 open, High = max M1 high, Low = min M1 low, Close = last M1 close, Volume = sum(tick_volume), Spread = last M1 spread.
+  - OHLC xatolari: 0, Dublikatlar: 0.
+- **M3 Native Broker (`data/raw/XAUUSDm/M3_broker/`):** 100,000 bars, 2025-12-08 dan 2026-10-13 gacha. Exness MT5 serveri tomonidan `TIMEFRAME_M3` sifatida to'g'ridan-to'g'ri taqdim etilgan.
+

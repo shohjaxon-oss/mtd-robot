@@ -60,3 +60,84 @@ Broker M1 va tick ma'lumotlarini faqat cheklangan muddat saqlagani sababli, `scr
 3. **Finish** tugmasini bosing.
 4. Bu vazifa har hafta avtomatik tarzda yangi M1 barlarni va millionlab ticklarni `data/archive/` papkasiga qo'shib boradi.
 
+---
+
+## 4. QO'RIQCHI EA (MTD_Guardian.mq5) Kompilyatsiyasi va O'rnatish
+
+> [!IMPORTANT]
+> **Kompilyatsiya haqida halol ma'lumot:**
+> MetaQuotes MT5 da buyruqlar satri (headless CLI) kompilyatori sukut bo'yicha terminal papkasida mavjud emas. Shuning uchun MQL5 fayllari **MetaEditor GUI** orqali qo'lda kompilyatsiya qilinishi lozim.
+
+### Qadam-baqadam o'rnatish:
+1. **Faylni ko'chirish:**
+   - Loyihadagi `mql5_ea/MTD_Guardian.mq5` faylidan nusxa oling.
+   - MetaTrader 5 -> `File` -> `Open Data Folder` -> `MQL5\Experts\` papkasiga tashlang.
+2. **MetaEditor da kompilyatsiya qilish:**
+   - MT5 da `F4` bosing (MetaEditor ochiladi).
+   - *Navigator* -> `Experts` -> `MTD_Guardian.mq5` ni oching.
+   - `F7` (Compile) tugmasini bosing.
+   - Xatolar bo'limida `0 errors, 0 warnings` ekanligini tasdiqlang.
+3. **Chartga o'rnatish:**
+   - MT5 da XAUUSDm grafigini oching (ixtiyoriy timeframe).
+   - Navigator panelida `Experts` -> `MTD_Guardian` ni chartga sudrab tashlang.
+   - "Common" bo'limida `Allow Algo Trading` katakchasini belgilang.
+   - Parametrlarni tekshiring:
+     - `InpHeartbeatTimeoutSec`: `30` (Python 30s jim qolsa, Safe Mode ishga tushadi)
+     - `InpSafeModeAction`: `ACTION_CLOSE_ALL` (yoki `ACTION_TIGHTEN_SL`)
+     - `InpDailyLossLimitPct`: `3.0` (Kunlik equity yo'qotish limiti 3%)
+     - `InpMagicNumber`: `10101`
+   - **OK** bosing. Chart burchagida tabassumli belgi yoki "MTD_Guardian" yozuvi paydo bo'ladi.
+
+---
+
+## 5. Demo Dry-Run Sinovi (scripts/demo_dry_run.py)
+
+Demo hisobda bitta to'liq savdo davrini (ochish, server SL/TP tekshiruvi, 3 soniya kutish, yopish) qo'lda sinash:
+
+```powershell
+.venv\Scripts\python scripts/demo_dry_run.py
+```
+
+### Kutilayotgan natija:
+- `[1/5] LIVE GUARD TASDIQLANDI:` (Trade Mode: DEMO)
+- `[2/5] BOZOR HOLATI:` (XAUUSDm Bid/Ask va Spread)
+- `[3/5] BUYURTMA YUBORILMOQDA:` (0.01 lot, Server SL/TP)
+- `[4/5] BUYURTMA BROKERDA OCHILDI:` (Ticket #, Fill narxi, Serverdagi SL/TP tasdiqlandi)
+- `[5/5] POZITSIYA YOPILMOQDA:` (Muvaffaqiyatli yopildi)
+
+---
+
+## 6. Kill-Switch ni Qo'lda Tiklash Tartibi
+
+Agar kunlik yoki umumiy Drawdown buzilib kill-switch ishga tushsa, savdo to'liq muzlatiladi. Uni avtomatik yoqish qat'iyan taqiqlangan.
+
+Faqat treyder sababni tahlil qilib, xavf bartaraf etilganiga ishonch hosil qilgach, quyidagi buyruq orqali tiklaydi:
+
+```powershell
+.venv\Scripts\python scripts/reset_kill_switch.py --reason "Drawdown sababi tahlil qilindi, demo sinovni davom ettirish xavfsiz" --force
+```
+
+Audit sababi majburiy bo'lib, `data/state/risk_state.db` dagi `risk_audit_log` jadvaliga muhrlanadi.
+
+---
+
+## 7. 48 Soatlik Uzluksiz Demo Forward Test Yo'riqnomasi
+
+Infratuzilmani (Live Runner + Watchdog + Guardian EA) 48 soat davomida uzluksiz sinash:
+
+1. **Telegram sozlamalari (`.env`):**
+   ```env
+   TELEGRAM_BOT_TOKEN="your_bot_token"
+   TELEGRAM_CHAT_ID="your_chat_id"
+   ```
+2. **MetaTrader 5 terminali:**
+   - Exness Demo hisobiga ulangan va ochiq turishi shart.
+   - `MTD_Guardian.mq5` chartga biriktirilgan bo'lishi kerak.
+3. **Watchdog nazoratida ishga tushirish:**
+   ```powershell
+   .venv\Scripts\python scripts/watchdog.py
+   ```
+   - Watchdog `python_brain/main.py` jarayonini fon rejimida kuzatadi.
+   - Jarayon kutilmaganda to'xtasa, Telegram ga xabar yuboradi va 5 soniyadan keyin qayta tiriltiradi (soatiga maksimal 5 marta).
+   - Tizim faqat **yangi yopilgan M15 barlarda** xavfsiz quvur sinovini o'tkazadi va har sekundda MT5 `FILE_COMMON` katalogiga heartbeat yuborib turadi.
+

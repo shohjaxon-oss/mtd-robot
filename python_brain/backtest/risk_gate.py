@@ -71,8 +71,11 @@ class DefaultRiskGate(RiskGate):
         if signal.action not in ["BUY", "SELL"]:
             return None
 
-        # 1. Position limit
-        if len(account.open_positions) >= self.max_open_positions:
+        # 1. Position limit (counted per setup/group)
+        active_groups = {pos.group_id for pos in account.open_positions if pos.group_id}
+        single_positions = [pos for pos in account.open_positions if not pos.group_id]
+        total_active_setups = len(active_groups) + len(single_positions)
+        if total_active_setups >= self.max_open_positions:
             return None
 
         # 2. Stop Loss mandatory check
@@ -93,18 +96,48 @@ class DefaultRiskGate(RiskGate):
         if self.halt_on_kill_switch and weekly_loss_pct >= self.max_weekly_loss_pct:
             return None
 
-        # 6. Lot Sizing based on fixed fractional risk
+        # 6. Sizing and Risk Checks
         sl_distance_price = abs(execution_price - signal.sl)
         if sl_distance_price <= 0:
             return None
 
-        # Risk amount in USD
-        risk_capital_usd = account.balance * (self.risk_per_trade_pct / 100.0)
-        # Dollar risk per 1.0 standard lot = sl_distance_price * contract_size
         loss_per_1lot = sl_distance_price * contract_size
         if loss_per_1lot <= 0:
             return None
 
+        # MULTI-LEG SETUP (Fixed Lot per leg, Atomic Approval)
+        if signal.legs and len(signal.legs) > 0:
+            total_volume = round(sum(leg.volume for leg in signal.legs), 2)
+            actual_risk_usd = total_volume * loss_per_1lot
+            # Hard limit: max_allowed_risk_per_trade_pct (1.0% of balance)
+            max_allowed_risk_pct = getattr(self, "max_allowed_risk_per_trade_pct", 1.0)
+            max_allowed_risk_usd = account.balance * (max_allowed_risk_pct / 100.0)
+            if actual_risk_usd > max_allowed_risk_usd:
+                return None  # Total setup risk exceeds max allowed tolerance
+
+            required_margin = (execution_price * contract_size * total_volume) / account.leverage
+            effective_free_margin = account.free_margin if account.free_margin > 0 else account.balance
+            if required_margin > effective_free_margin * 0.90:
+                return None
+
+            order = Order(
+                order_id=self.order_counter,
+                symbol="XAUUSDm",
+                side=OrderSide.BUY if signal.action == "BUY" else OrderSide.SELL,
+                volume=total_volume,
+                requested_price=execution_price,
+                sl=signal.sl,
+                tp=signal.tp,
+                time_utc=signal.time_utc,
+                comment=signal.comment,
+                legs=signal.legs,
+                group_id=signal.group_id,
+            )
+            self.order_counter += 1
+            return order
+
+        # SINGLE LEG (Fractional risk sizing)
+        risk_capital_usd = account.balance * (self.risk_per_trade_pct / 100.0)
         raw_lot = risk_capital_usd / loss_per_1lot
 
         # Round down to valid lot step
@@ -118,7 +151,6 @@ class DefaultRiskGate(RiskGate):
             sized_lot = self.max_lot
 
         # A8: Min lot risk guard
-        # If forced min_lot causes real risk to exceed max tolerance (e.g. 1.5x target risk), REJECT
         actual_risk_usd = sized_lot * loss_per_1lot
         max_allowed_risk_usd = risk_capital_usd * self.max_risk_tolerance_multiplier
         if actual_risk_usd > max_allowed_risk_usd:

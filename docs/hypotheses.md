@@ -162,3 +162,27 @@
 - **Parametrlar:** `fast_ema` [20], `slow_ema` [50], `rsi_overbought` [50, 55], `rr_ratio` [2.0]
 - **Rad Etish Sharti:** Gross PF < 1.05 bo'lsa darhol rad etiladi.
 
+---
+
+## Gipoteza 9: `FU_FORMATION` (Trader Belgilagan Qat'iy Deterministik Setup)
+- **ID:** `HYP-09` (Pre-registered 2026-10-13, natijalarni ko'rishdan oldin)
+- **Timeframe:** FAQAT M1, M3, M5 (boshqa timeframe'lar qat'iyan taqiqlangan).
+- **Iqtisodiy/Tuzilmaviy Mantiq:**
+  Loyiha egasi (trader) tomonidan belgilangan mexanik sham modeli. Kamida 3 ta ketma-ket bir xil yo'nalishli shamlardan so'ng, navbatdagi FU sham oldingi sham ekstremumini yangilab (likvidlikni supurib olib / liquidity sweep), lekin teskari yo'nalishda oldingi sham tanasi ichida yopiladi (rejection / fakeout). Bu qisqa muddatli likvidlik trapini ko'rsatadi.
+- **Kirish Qoidalari:**
+  - **SELL:** Kamida 3 ta ketma-ket bullish sham ($t-3, t-2, t-1$). Trend shamlari orasida engulfing yo'q. FU sham ($t$) bearish, $high_t > high_{t-1}$, $close_t < close_{t-1}$. Kirish: $t+1$ sham ochilishi (market SELL).
+  - **BUY:** Kamida 3 ta ketma-ket bearish sham ($t-3, t-2, t-1$). Trend shamlari orasida engulfing yo'q. FU sham ($t$) bullish, $low_t < low_{t-1}$, $close_t > close_{t-1}$. Kirish: $t+1$ sham ochilishi (market BUY).
+- **Chiqish Qoidalari:**
+  - Stop Loss: FU sham ekstremumidan hisoblanadi (SELL: $high_t + 5 \text{ pip}$, BUY: $low_t - 5 \text{ pip}$).
+  - 2 ta Leg (har biri 0.01 lot):
+    - Leg A: $\text{TP} = 20 \text{ pip}$.
+    - Leg B: $\text{TP} = 30 \text{ pip}$.
+    - Leg A TP ga yetganda Leg B ning SL i Entry narxiga ko'chiriladi (Breakeven).
+- **Parametrlar Gridi:**
+  - Baseline: `min_trend_candles=3`, `engulf_mode='body'` (M1, M3, M5 da 3 run).
+  - Variantlar: `min_trend_candles` in {3, 4}, `engulf_mode` in {'body', 'range'}.
+- **Kutilgan Xatti-harakat:**
+  - M1/M3/M5 da yuqori chastotali signallar beradi. Oltinda o'rtacha spread 1.6 pip bo'lgani sababli, 20 pip TP da spread xarajati ~8% ni tashkil qiladi. Breakeven ga o'tkazish xavfni kamaytiradi, lekin ko'p sonli savdolarni nolga (spread xarajati bilan kichik ziyon) yopishi mumkin.
+- **Rad Etish Sharti (Rejection Criteria):**
+  - OOS Profit Factor < 1.3 yoki 1.5x xarajat stressida PF < 1.15 bo'lsa, gipoteza rad etiladi.
+

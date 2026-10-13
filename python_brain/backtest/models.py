@@ -21,12 +21,26 @@ class ExitReason(str, Enum):
 
 
 @dataclass
+class SignalLeg:
+    leg_id: str  # "A" | "B" | etc.
+    volume: float
+    tp: Optional[float] = None
+    tp_pips: Optional[float] = None
+    comment: str = ""
+
+
+@dataclass
 class Signal:
     time_utc: datetime
     action: str  # BUY | SELL | CLOSE | HOLD
     sl: Optional[float] = None
     tp: Optional[float] = None
     comment: str = ""
+    # Multi-leg setup extensions:
+    legs: Optional[List[SignalLeg]] = None
+    breakeven_on_first_tp: bool = False
+    group_id: Optional[str] = None
+    pip_size_price: float = 0.10
 
 
 @dataclass
@@ -40,6 +54,8 @@ class Order:
     tp: Optional[float]
     time_utc: datetime
     comment: str = ""
+    legs: Optional[List[SignalLeg]] = None
+    group_id: Optional[str] = None
 
 
 @dataclass
@@ -70,6 +86,13 @@ class Position:
     slippage_cost: float = 0.0
     spread_cost: float = 0.0
     is_ambiguous_exit: bool = False
+
+    # Multi-leg tracking:
+    group_id: Optional[str] = None
+    leg_id: Optional[str] = None
+    breakeven_on_first_tp: bool = False
+    breakeven_activated: bool = False
+    original_sl: Optional[float] = None
 
 
 @dataclass

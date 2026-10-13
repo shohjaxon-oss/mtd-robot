@@ -21,6 +21,7 @@ except ImportError:
 
 TIMEFRAME_MAP = {
     "M1": (mt5.TIMEFRAME_M1 if mt5 else 1, "M1", "month"),
+    "M3": (getattr(mt5, "TIMEFRAME_M3", 3) if mt5 else 3, "M3", "month"),
     "M5": (mt5.TIMEFRAME_M5 if mt5 else 5, "M5", "month"),
     "M15": (mt5.TIMEFRAME_M15 if mt5 else 15, "M15", "year"),
     "H1": (mt5.TIMEFRAME_H1 if mt5 else 16385, "H1", "year"),

@@ -158,6 +158,56 @@ Ushbu hujjatda `mtd-robot` loyihasi bo'yicha qabul qilingan barcha muhim texnik,
 - **Oqibati:**
   Strategiya tadqiqotining barcha zaif nuqtalari matematik aniqlikda fosh qilindi. Retail MT5 hisobidagi swap cheklovlari va kelgusidagi arxitektura yo'nalishi (kun ichi / swap-free / komissiyali fyucherslar) aniq belgilandi.
 
+---
 
+## ADR-0011: Strict Live Guard va Demo-Only Enforcement (6-8 Bosqichlar)
+- **Sana:** 2026-10-13
+- **Holati:** Qabul qilindi
+- **Kontekst:**
+  Infratuzilma bosqichida (Risk Engine, Broker Execution, Live Runner, Watchdog) real pul xavf ostida qolmasligi kafolatlanishi shart. Strategiya tadqiqoti hali yakunlanmagan.
+- **Qaror:**
+  1. `LiveGuard` va `validate_demo_account` moduli joriy qilindi.
+  2. Barcha ijro nuqtalari (`MT5BrokerExecutor`, `LiveRunner`, `PipelineTestStrategy`, `demo_dry_run`) `account.trade_mode == 0` (DEMO) ekanligini qat'iy tekshiradi.
+  3. `config/settings.yaml` da `safety.allow_live: false` o'rnatildi. Faqat 10/10 Gate'dan o'tgandan keyin qo'lda o'zgartiriladi.
+  4. Real hisob aniqlanganda yoki `allow_live=True` ruxsatsiz berilganda tizim darhol `LiveTradingBlockedError` bilan to'xtaydi.
+- **Oqibati:**
+  Real hisobda tasodifiy yoki xato buyurtma berilish ehtimoli 100% istisno qilindi.
 
+---
+
+## ADR-0012: Persistent Risk Engine va MTD_Guardian EA Circuit Breakers
+- **Sana:** 2026-10-13
+- **Holati:** Qabul qilindi
+- **Kontekst:**
+  Python jarayoni qayta ishga tushganda yoki tarmoq uzilganda kunlik/haftalik DD xotirasi yo'qolmasligi, kill-switch saqlanib qolishi va broker terminali tomondan mustaqil xavfsizlik zanjiri bo'lishi lozim.
+- **Qaror:**
+  1. SQLite asosidagi `RiskStateStore` (`data/state/risk_state.db`) yaratildi: Kill-switch holati, kunlik/haftalik PnL, ketma-ket zararlar va cooldown muddati diskda saqlanadi.
+  2. Kill-switch faollashganda avtomatik qayta yoqilmaydi; faqat `scripts/reset_kill_switch.py --reason "..." --force` orqali qo'lda tiklanadi.
+  3. MQL5 tomonida DLL-siz toza `MTD_Guardian.mq5` yaratildi. U MT5 ning `FILE_COMMON` katalogidagi `mtd_heartbeat.json` ni kuzatadi. Agar Python 30 soniyadan ko'proq jim qolsa, barcha ochiq savdolarni favqulodda yopadi (Safe Mode).
+  4. Kunlik equity yo'qotishi 3.0% ga yetsa, EA barcha pozitsiyalarni mustaqil ravishda yopadi.
+- **Oqibati:**
+  Ikki tomonlama mustaqil himoya (Python Brain Risk Gate + MT5 MQL5 Guardian EA) ta'minlandi.
+
+---
+
+## ADR-0013: FU Formation Strategiyasi va Multi-Leg Breakeven Arxitekturasi
+- **Sana:** 2026-10-13
+- **Holati:** Qabul qilindi
+- **Kontekst:**
+  Loyiha egasi (trader) tomonidan "FU Formation" nomli scalping strategiyasi (HYP-09) taqdim etildi. Strategiya 2 ta legdan iborat bo'lib (har biri 0.01 lot, Leg A TP: 20 pip, Leg B TP: 30 pip), Leg A yopilgach Leg B SL'i kirish narxiga (breakeven) ko'chirilishi shart.
+- **Qaror:**
+  1. **Pip Birligi:** XAUUSDm da 1 pip = 0.10 USD (100 point). Agar 0.01 USD olinsa, brokerning median spreadi (160 pt = 1.6 pip = $0.16) Leg A TP ($0.20) dan oshib, savdoni iqtisodiy jihatdan imkonsiz qilar edi. Pip narxi `config/risk.yaml` ga kiritildi va hardcode qilinmadi.
+  2. **Multi-Leg va Guruh Ijrosi:** Backtest dvigateli (`engine.py`) va RiskGate (`risk_gate.py`) kengaytirildi:
+     - Har bir setup bitta `group_id` ostida bir nechta leglarga ajratiladi.
+     - RiskGate setup darajasida atomik tasdiqlaydi (ikkala leg birga o'tadi yoki rad etiladi).
+     - Fixed lot (0.01 + 0.01) rejimi qo'llab-quvvatlandi.
+     - Setup umumiy riski ($0.02 \times \text{SL masofasi} \times 100$) balansning $1\%$ idan oshsa, qat'iy rad etiladi.
+  3. **Bar Ichidagi Konservativ Tartib:**
+     - (i) SL va TP bitta barda tegsa, SL birinchi deb hisoblanadi (konservativ prinsip saqlanadi).
+     - (ii) Breakeven SL keyingi bardan kuchga kiradi (lookahead/intra-bar cheating oldini olish uchun).
+     - (iii) Bitta barda TP_A va TP_B ikkalasiga ham tegsa: Leg B faqat narx qaytib BE ga urilmagan bo'lsa TP_B da yopiladi; aks holda Leg B BE da yopilgan deb olinadi va setup `is_ambiguous_exit=True` deb belgilanadi.
+     - (iv) Boshlang'ich SL ikkala legni ham darhol yopadi.
+  4. **Risk Profil Override:** Standart `risk.yaml` dagi `min_risk_reward_ratio: 1.5` global qoidasi o'zgartirilmasdan, `strategy_profiles.fu_formation.min_risk_reward_ratio: 0.5` override qilindi (chunki dinamik SL 15-20 pip va TP 20/30 pip bo'lganda R:R odatda 0.8-1.2 atrofida bo'ladi).
+- **Oqibati:**
+  Backtest dvigateli va Live ijro arxitekturasi orqaga to'liq mos holda multi-leg va breakeven funksiyalariga ega bo'ldi. Mavjud 87 ta regression testlari 100% yashil qoldi.
 
