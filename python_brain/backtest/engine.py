@@ -6,12 +6,17 @@ Strict execution guarantees:
    Buy SL/TP evaluated against Bid prices; Sell SL/TP evaluated against Ask prices.
 3. Conservative Intrabar Conflict Resolution: If both SL and TP are touched within the same bar,
    STOP LOSS is unconditionally executed first.
-4. Dynamic Costs: Realistic time-dependent spreads, slippage on stops, and overnight holding swaps.
-5. RiskGate integration: Every pending order must pass strict risk constraints before execution.
+4. Realistic Multi-factor Costs:
+   - A1: Single accounting of Swap and Commission (no double-deduction).
+   - A2: Rollover blackout strictly enforced at execution bar open time (21:00-22:00 UTC).
+   - A3: Gap-down/Gap-up Stop Loss fill protection (min/max with bar_open + slippage).
+   - A5: Configurable spread modes (auto, median, mean, p95 stress, empirical sample).
+   - A6: Intrabar worst-point equity drawdown tracking.
+   - A9: Full economic news blackout calendar integration.
 """
 
 from datetime import datetime
-from typing import List, Optional
+from typing import Any, List, Optional
 import numpy as np
 import pandas as pd
 from python_brain.backtest.costs import CostModel
@@ -37,12 +42,20 @@ class BacktestEngine:
         contract_size: float = 100.0,
         point: float = 0.001,
         stop_out_level_pct: float = 20.0,
+        calendar: Optional[Any] = None,  # NewsCalendar or None (A9)
+        news_before_minutes: int = 15,
+        news_after_minutes: int = 15,
+        lookback_bars: int = 300,
     ):
         self.initial_balance = initial_balance
         self.leverage = leverage
         self.contract_size = contract_size
         self.point = point
         self.stop_out_level_pct = stop_out_level_pct
+        self.calendar = calendar
+        self.news_before_minutes = news_before_minutes
+        self.news_after_minutes = news_after_minutes
+        self.lookback_bars = lookback_bars
 
     def run(
         self,
@@ -99,61 +112,82 @@ class BacktestEngine:
             bar_spread: float = float(bar["spread"]) if "spread" in bar else 240.0
             local_atr: float = float(atr_14[i])
 
-            # Day and week rollover tracking for drawdown limits
+            # Day and week tracking for drawdown limits
             bar_date_str = bar_time.strftime("%Y-%m-%d")
             bar_week_num = bar_time.isocalendar()[1]
 
             if prev_date is not None and bar_date_str != prev_date:
-                # Reset daily realized P&L
                 account.daily_realized_pnl = 0.0
 
             if prev_week is not None and bar_week_num != prev_week:
-                # Reset weekly realized P&L
                 account.weekly_realized_pnl = 0.0
 
             prev_date = bar_date_str
             prev_week = bar_week_num
 
-            # Calculate effective spread and price units for this bar
-            spread_pts, spread_price = costs.get_effective_spread(bar_time, bar_spread)
+            # A9: Check Economic News Blackout window
+            is_news_blackout = False
+            if self.calendar is not None:
+                is_news_blackout = self.calendar.is_blackout(
+                    bar_time,
+                    before_minutes=self.news_before_minutes,
+                    after_minutes=self.news_after_minutes,
+                )
+
+            # Calculate effective spread for this bar
+            spread_pts, spread_price = costs.get_effective_spread(
+                time_utc=bar_time,
+                bar_spread=bar_spread,
+                is_news_blackout=is_news_blackout,
+            )
 
             # -------------------------------------------------------------
             # STEP 1: EXECUTE PENDING ORDER FROM PREVIOUS BAR CLOSE
             # Strictly executed at current bar OPEN
             # -------------------------------------------------------------
             if pending_signal is not None:
-                is_buy = pending_signal.action == "BUY"
-                exec_price = bar_open + spread_price if is_buy else bar_open
+                # A2: Rollover blackout check on EXECUTION BAR OPEN TIME
+                # 21:00-22:00 UTC da yangi pozitsiya ochilmasin
+                is_rollover_now = bar_time.hour in [21, 22]
 
-                approved_order = gate.approve(
-                    signal=pending_signal,
-                    execution_price=exec_price,
-                    account=account,
-                    point=self.point,
-                    contract_size=self.contract_size,
-                )
+                # A9: News blackout check on execution time
+                if is_rollover_now or is_news_blackout:
+                    # Cancel pending signal during blackout illiquidity
+                    pending_signal = None
+                else:
+                    is_buy = pending_signal.action == "BUY"
+                    exec_price = bar_open + spread_price if is_buy else bar_open
 
-                if approved_order is not None:
-                    commission = costs.calculate_commission(approved_order.volume)
-                    account.balance -= commission
-
-                    pos = Position(
-                        ticket=current_ticket,
-                        symbol="XAUUSDm",
-                        side=approved_order.side,
-                        volume=approved_order.volume,
-                        open_price=round(exec_price, 3),
-                        open_time_utc=bar_time,
-                        sl=approved_order.sl,
-                        tp=approved_order.tp,
-                        comment=approved_order.comment,
-                        commission=commission,
-                        spread_cost=spread_price * self.contract_size * approved_order.volume,
+                    approved_order = gate.approve(
+                        signal=pending_signal,
+                        execution_price=exec_price,
+                        account=account,
+                        point=self.point,
+                        contract_size=self.contract_size,
                     )
-                    current_ticket += 1
-                    account.open_positions.append(pos)
 
-                pending_signal = None  # Consumed
+                    if approved_order is not None:
+                        commission = costs.calculate_commission(approved_order.volume)
+                        # A1: Do NOT deduct commission from account.balance here!
+                        # It will be cleanly deducted upon position closure.
+
+                        pos = Position(
+                            ticket=current_ticket,
+                            symbol="XAUUSDm",
+                            side=approved_order.side,
+                            volume=approved_order.volume,
+                            open_price=round(exec_price, 3),
+                            open_time_utc=bar_time,
+                            sl=approved_order.sl,
+                            tp=approved_order.tp,
+                            comment=approved_order.comment,
+                            commission=commission,
+                            spread_cost=spread_price * self.contract_size * approved_order.volume,
+                        )
+                        current_ticket += 1
+                        account.open_positions.append(pos)
+
+                    pending_signal = None  # Consumed
 
             # -------------------------------------------------------------
             # STEP 2: CHECK SL / TP / MARGIN STOPS ON OPEN POSITIONS
@@ -164,7 +198,6 @@ class BacktestEngine:
                 is_closed = False
                 close_price = 0.0
                 reason = None
-                is_stop_out = False
 
                 if pos.side == OrderSide.BUY:
                     # Buy SL/TP are triggered by Bid price
@@ -173,18 +206,20 @@ class BacktestEngine:
                     hit_tp = (pos.tp is not None) and (bar_high >= pos.tp)
 
                     if hit_sl:
-                        # Slippage applies to Stop Loss
                         slip = costs.get_slippage_penalty("BUY", True, spread_price, local_atr)
-                        close_price = pos.sl - slip
+                        # A3: Gap-down protection: fill base is min(SL, bar_open)
+                        fill_base = min(pos.sl, bar_open)
+                        close_price = fill_base - slip
                         reason = ExitReason.STOP_LOSS
                         is_closed = True
                     elif hit_tp:
-                        close_price = pos.tp  # TP executed at limit without adverse slippage
+                        close_price = pos.tp  # TP limit executed without adverse slip
                         reason = ExitReason.TAKE_PROFIT
                         is_closed = True
 
                 else:  # SELL Position
                     # Sell SL/TP are triggered by Ask price = Bid + Spread
+                    ask_open = bar_open + spread_price
                     ask_high = bar_high + spread_price
                     ask_low = bar_low + spread_price
 
@@ -193,7 +228,9 @@ class BacktestEngine:
 
                     if hit_sl:
                         slip = costs.get_slippage_penalty("SELL", True, spread_price, local_atr)
-                        close_price = pos.sl + slip
+                        # A3: Gap-up protection: fill base is max(SL, ask_open)
+                        fill_base = max(pos.sl, ask_open)
+                        close_price = fill_base + slip
                         reason = ExitReason.STOP_LOSS
                         is_closed = True
                     elif hit_tp:
@@ -201,11 +238,12 @@ class BacktestEngine:
                         reason = ExitReason.TAKE_PROFIT
                         is_closed = True
 
-                # Overnight Swap calculation (accumulates if position held past 00:00 UTC)
+                # A1 & A7: Overnight Swap calculation (accumulates if position held past 00:00 UTC)
+                # Swap is accumulated into pos.accumulated_swap ONLY.
+                # account.balance is NOT modified here to prevent double-deduction.
                 if not is_closed and bar_time.hour == 0 and bar_time.minute == 0:
                     swap_cost = costs.calculate_swap(pos.side.value, pos.volume, bar_time)
                     pos.accumulated_swap += swap_cost
-                    account.balance += swap_cost  # Adds/deducts swap from balance
 
                 if is_closed:
                     pos.is_closed = True
@@ -220,6 +258,7 @@ class BacktestEngine:
                         price_diff = pos.open_price - pos.close_price
 
                     gross_pnl = price_diff * self.contract_size * pos.volume
+                    # A1: Exactly once deduction: gross_pnl + accumulated_swap - commission
                     pos.realized_pnl = round(gross_pnl + pos.accumulated_swap - pos.commission, 2)
 
                     account.balance += pos.realized_pnl
@@ -237,13 +276,14 @@ class BacktestEngine:
                     else:
                         unrealized = (pos.open_price - current_ask) * self.contract_size * pos.volume
 
-                    pos.unrealized_pnl = unrealized + pos.accumulated_swap
+                    # A1: Floating unrealized includes swap and commission
+                    pos.unrealized_pnl = unrealized + pos.accumulated_swap - pos.commission
                     active_positions.append(pos)
 
             account.open_positions = active_positions
 
             # -------------------------------------------------------------
-            # STEP 3: UPDATE ACCOUNT EQUITY, MARGIN & DRAWDOWN
+            # STEP 3: UPDATE ACCOUNT EQUITY, MARGIN & INTRABAR DRAWDOWN (A6)
             # -------------------------------------------------------------
             total_unrealized = sum(p.unrealized_pnl for p in account.open_positions)
             account.equity = account.balance + total_unrealized
@@ -258,7 +298,19 @@ class BacktestEngine:
                 (account.equity / total_used_margin * 100.0) if total_used_margin > 0 else 999999.0
             )
 
-            account.update_peak()
+            # A6: Calculate worst intrabar equity for realistic peak-to-trough DD
+            intrabar_worst_unrealized = 0.0
+            for p in account.open_positions:
+                if p.side == OrderSide.BUY:
+                    worst_bid = bar_low
+                    diff = (worst_bid - p.open_price) * self.contract_size * p.volume
+                else:
+                    worst_ask = bar_high + spread_price
+                    diff = (p.open_price - worst_ask) * self.contract_size * p.volume
+                intrabar_worst_unrealized += (diff + p.accumulated_swap - p.commission)
+
+            intrabar_worst_equity = account.balance + intrabar_worst_unrealized
+            account.update_peak(current_time=bar_time, intrabar_worst_equity=intrabar_worst_equity)
 
             # Stop-Out protection
             if total_used_margin > 0 and account.margin_level_pct <= self.stop_out_level_pct:
@@ -267,7 +319,7 @@ class BacktestEngine:
                     p.close_price = bar_close
                     p.close_time_utc = bar_time
                     p.exit_reason = ExitReason.STOP_OUT
-                    p.realized_pnl = p.unrealized_pnl
+                    p.realized_pnl = round(p.unrealized_pnl, 2)
                     account.balance += p.realized_pnl
                     account.closed_positions.append(p)
                 account.open_positions = []
@@ -276,18 +328,11 @@ class BacktestEngine:
             # STEP 4: STRATEGY EVALUATION ON BAR CLOSE
             # -------------------------------------------------------------
             # Strategy ONLY sees candles up to bar i (Zero-Lookahead Guarantee)
-            # High-performance slicing: passing recent lookback window (e.g. 300 bars)
-            lookback = 300
-            start_idx = max(0, i + 1 - lookback)
+            start_idx = max(0, i + 1 - self.lookback_bars)
             history_slice = data.iloc[start_idx : i + 1]
             signal = strategy.on_bar(history_slice)
 
             if signal is not None and signal.action in ["BUY", "SELL"]:
-                # Check Rollover blackout window (UTC 21:00-22:00)
-                if bar_time.hour in [21, 22]:
-                    # Prohibit new entries during severe illiquidity window
-                    pass
-                else:
-                    pending_signal = signal
+                pending_signal = signal
 
         return account

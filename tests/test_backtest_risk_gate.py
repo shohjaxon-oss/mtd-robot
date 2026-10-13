@@ -52,7 +52,7 @@ def test_position_sizing_calculation():
 
 
 def test_daily_loss_limit_block():
-    gate = DefaultRiskGate(max_daily_loss_pct=2.0)
+    gate = DefaultRiskGate(max_daily_loss_pct=2.0, halt_on_kill_switch=True)
     # Boshlang'ich balans $10,000. Bugungi realized zarar -$250 (2.5% > 2.0%)
     account = AccountState(
         initial_balance=10000.0,
@@ -70,7 +70,7 @@ def test_daily_loss_limit_block():
 
 
 def test_kill_switch_max_drawdown():
-    gate = DefaultRiskGate(kill_switch_dd_pct=12.0)
+    gate = DefaultRiskGate(kill_switch_dd_pct=12.0, halt_on_kill_switch=True)
     # Max DD = 13.0% (> 12.0%)
     account = AccountState(
         initial_balance=10000.0,

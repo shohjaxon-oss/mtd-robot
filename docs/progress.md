@@ -13,9 +13,9 @@
 |---|---|---|---|---|
 | 1 | **Poydevor va spetsifikatsiyani qulflash** | ✅ Yopildi | ✅ O'tdi | Muhit, tuzilma, config, logging, MT5 ulanish, testlar |
 | 2 | **Data layer (Tarixiy ma'lumot, sifat, profil)** | ✅ Yopildi | ✅ O'tdi | M1-D1 ma'lumot Parquet'da, sifat hisoboti, spread modeli |
-| 3 | **Backtest engine va xarajat modeli** | ✅ Yopildi | ✅ O'tdi | Event-driven, Bid/Ask, SL-first, Monte Carlo, Holdout qulfi, WFO |
-| 4 | Strategiya tadqiqoti va validatsiya | 🔄 Keyingi | Kutilmoqda | 3-5 g'oya, out-of-sample edge tekshiruvi |
-| 5 | Signal engine, rejim aniqlash, yangilik filtri | ⏳ Kutilmoqda | - | Real-vaqt signallari, yangilik filtri |
+| 3 | **Backtest engine va xarajat modeli** | ✅ Yopildi | ✅ O'tdi | Event-driven, A1-A12 audit tuzatishlari, 47/47 test |
+| 4 | **Strategiya tadqiqoti va validatsiya** | ✅ Yopildi | ⚠️ Rad etildi (Halol) | 4 oila sinaldi, xarajatlar ostida edge topilmadi, Holdout qulfda |
+| 5 | Signal engine, rejim aniqlash, yangilik filtri | 🔄 Keyingi | Kutilmoqda | Yangi gipotezalar (intraday/short-bias), rejim detektorlari |
 | 6 | Risk engine (eng muhim modul) | ⏳ Kutilmoqda | - | 0.5% risk, kill-switch, lot hisoblash |
 | 7 | MQL5 EA ijro qatlami va ko'prik | ⏳ Kutilmoqda | - | Terminal ichidagi himoya qalqoni |
 | 8 | Monitoring, logging, ogohlantirish, testlar | ⏳ Kutilmoqda | - | Telegram bot, 48h uzluksiz demo test |
@@ -87,10 +87,23 @@
 
 ## 3/10 Gate Mezonlari
 
-1. **`pytest` barcha testlar yashil:** ✅ **41/41 test yashil** (`1.14s`).
+1. **`pytest` barcha testlar yashil:** ✅ **51/51 test yashil** (`2.07s`).
 2. **Zero-lookahead qat'iy isboti:** ✅ Testlangan (`test_zero_lookahead_execution`).
 3. **Konservativ intrabar ziddiyat:** ✅ Testlangan (`test_intrabar_conservative_sl_tp`).
 4. **Haqiqiy xarajatlar va stress-test:** ✅ Empirik profil, 3x swap, Monte Carlo 1.5x/2.0x stress.
 5. **Holdout qulfi mavjud:** ✅ Oxirgi 20% qulflangan, `docs/holdout_log.md` audit jurnali sozlangan.
-6. **Baseline hisobotlari:** ✅ `reports/` katalogida barcha 6 ta eksperiment hisoboti to'liq mavjud.
+6. **Baseline hisobotlari:** ✅ `reports/` katalogida barcha baseline va tajriba hisobotlari to'liq mavjud.
+
+---
+
+## 4/10 Bosqich: Strategiya Tadqiqoti va Validatsiya Natijalari
+
+- [x] **Pre-registration (`docs/hypotheses.md`):** 4 ta oila (`HYP-01`, `HYP-02`, `HYP-03`, `HYP-04`) va 1 ta diagnostika (`DIAG-01`) natijalarni ko'rishdan oldin ro'yxatga olindi.
+- [x] **Strategiya kodlari:** `python_brain/signals/` ostida `SessionBreakout`, `VolatilitySqueeze`, `TrendPullback`, `MeanReversion` yaratildi.
+- [x] **Lookahead kesish testi:** `tests/test_strategy_lookahead_slice.py` barcha 4 ta strategiyada 0-lookahead ni isbotladi.
+- [x] **Eksperimentlar Jurnali:** `research/experiment_log.csv` ga barcha 9 ta tajriba (Train 80% davrida) qayd etildi.
+- [x] **Gate Natijasi:** Barcha nomzodlar B4 Gate mezonlaridan o'tmadi (PF 0.64 - 0.95). **Edge topilmadi.**
+- [x] **Holdout:** Holdout ochilmadi, ma'lumotlar ifloslanishdan asrab qolindi.
+- [x] **Hujjat:** `docs/strategy_selection.md` da to'liq sabablar va keyingi qadamlar tahlili yozildi.
+
 

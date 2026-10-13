@@ -1,0 +1,22 @@
+{
+  "initial_balance": 10000.0,
+  "final_balance": 8716.71,
+  "final_equity": 8716.71,
+  "net_profit": -1283.29,
+  "return_pct": -12.83,
+  "total_trades": 843,
+  "winning_trades": 347,
+  "losing_trades": 496,
+  "winrate_pct": 41.16,
+  "profit_factor": 0.95,
+  "max_equity_drawdown_pct": 29.07,
+  "max_balance_drawdown_pct": 28.74,
+  "sharpe_ratio": -0.75,
+  "sortino_ratio": -8.0,
+  "recovery_factor": -0.44,
+  "expectancy_usd": -1.52,
+  "avg_duration_hours": 4.71,
+  "total_spread_cost": 2190.96,
+  "total_swap_cost": -150.19,
+  "total_commission": 0.0
+}

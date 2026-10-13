@@ -102,3 +102,41 @@ Ushbu hujjatda `mtd-robot` loyihasi bo'yicha qabul qilingan barcha muhim texnik,
 - **Oqibati:**
   Loyiha 100% brokerning haqiqiy ma'lumotlariga tayangan holda davom etadi. Overfitting va lookahead xavflari holdout va walk-forward orqali qat'iy nazorat qilinadi.
 
+---
+
+## ADR-0008: Backtest Engine Arxitekturasi va Real Xarajatlar Modeli Standartlari
+- **Sana:** 2026-10-13
+- **Holat:** Qabul qilindi
+- **Kontekst:**
+  3/10 bosqich auditi natijasida:
+  1) Swap va komissiya ikki marta yechilishi aniqlandi (kunlik balansda va yopilishda).
+  2) Kill-switch tadqiqot paytida to'liq tarixni ko'rishga to'sqinlik qilib, dastlabki 119 savdodan keyin simulyatsiyani to'xtatib qo'ydi.
+  3) Rollover blackout ijro barining ochilish vaqtida tekshirilishi kerak edi.
+  4) Gap-down / Gap-up paytida Stop Loss bar_open narxidan yomonroq to'ldirilishi (slippage bilan) lozim edi.
+- **Qaror:**
+  1. **Yagona hisob-kitob (Single Accounting):** Komissiya ochilishda balansdan yechilmaydi, balki pozitsiyada saqlanadi. Swap har kuni faqat `pos.accumulated_swap` ga to'planadi (balans o'zgarmaydi, suzuvchi equityda aks etadi). Yopilish paytida `realized_pnl = gross_pnl + accumulated_swap - commission` hisoblanib, balansga FAQAT BIR MARTA qo'shiladi. Balans o'zgarishi aniq `gross P&L + swap - commission` ga teng.
+  2. **`halt_on_kill_switch` bayrog'i:** Strategiya tadqiqotida (baseline, 4/10, MC, WFO) `halt_on_kill_switch = False` qilinadi, shunda butun tarix to'liq baholanadi. Biroq 12% DD ga tushgan birinchi sana `account.kill_switch_triggered_at` audit sifatida saqlanadi. Jonli ijro va risk-testlarda esa `True` qilinadi.
+  3. **Spread modeli:** Default rejim `"auto_bar_or_median"` etib belgilandi (mavjud davrda real bar `spread` ishlatiladi, yo'q davrda soatlik median, rollover/news blackout paytida p95 ga kengayadi).
+  4. **Swap Kunlari va Vaqti:** Python `weekday()` bo'yicha: 0=Dushanba, 1=Seshanba, 2=Chorshanba, 3=Payshanba, 4=Juma, 5=Shanba, 6=Yakshanba. Exness MT5 da `swap_rollover3days = 3` (MT5 enum bo'yicha 3 = Chorshanba, Wednesday night rollover). Python da bu `weekday() == 2` (yoki Payshanbaga o'tish kechasi) ga to'g'ri keladi. Bu qiymat config ga chiqarildi.
+  5. **Min-lot Risk Toleransi:** Agar majburiy min-lot (0.01) hisobdagi 0.5% risk kapitalining 1.5 barobaridan (masalan $2.50 ning $3.75 chegarasi) oshib ketadigan keng SL bo'lsa, risk-gate buyruqni qat'iy rad etadi.
+- **Oqibati:**
+  Backtest motori matematik va buxgalteriya jihatidan 100% to'g'ri va real bozor fizikasiga moslandi.
+
+---
+
+## ADR-0009: 4/10 Strategiya Tadqiqoti, Nomzodlarni Rad Etish va Holdoutni Qulflab Qolish
+- **Sana:** 2026-10-13
+- **Holat:** Qabul qilindi (Halol Kvant Qarori: Edge Topilmadi)
+- **Kontekst:**
+  4/10 bosqichda XAUUSD uchun 4 ta klassik strategiya oilasi (`HYP-01`: SessionBreakout, `HYP-02`: VolatilitySqueeze, `HYP-03`: TrendPullback, `HYP-04`: MeanReversion) natijalarni ko'rishdan oldin `docs/hypotheses.md` da oldindan ro'yxatga olindi.
+  Har bir nomzod faqat Train/Dev (80%, 2014-2024) ma'lumotlarida qat'iy protokol (WFO, 1.5x xarajat stressi, Long/Short ajratish, Monte Carlo) bilan sinovdan o'tkazildi.
+- **Qaror:**
+  1. **Barcha 4 ta nomzod oilasi (9 ta parametr konfiguratsiyasi) B4 Gate mezonlaridan o'ta olmadi (PF 0.64 - 0.95)**. Baza Profit Factor talabi ($\ge 1.40$) va stress talabi ($\ge 1.20$) bajarilmadi.
+  2. **Holdout (oxirgi 20%) OCHILMAYDI va QAT'IY MUHRLANGAN HOLDA QOLADI.** Nomzodlar Train davrida o'zini oqlamagani sababli, holdout ma'lumotlarini ifloslantirish (data snooping) qat'iy man etiladi.
+  3. **Halollik prinsipi:** Hech qanday natija bezatilmadi yoki parametrlarni haddan tashqari moslash (curve-fitting) orqali sun'iy foyda ko'rsatilmadi. Xulosa: "Edge topilmadi".
+  4. **Keyingi yo'nalish:** Uzoq ushlab turiladigan long swing strategiyalaridagi og'ir swap yukini bartaraf etuvchi kun ichi (intraday non-overnight) yoki short-biased momentum modellari o'rganiladi.
+- **Oqibati:**
+  Bozor haqiqatiga bo'ysunildi, real kapital asrab qolindi va loyihaning ilmiy integritysi 100% saqlandi.
+
+
+

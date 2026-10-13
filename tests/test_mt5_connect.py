@@ -12,7 +12,7 @@ def mock_mt5():
 
     # Mock account info
     acc = MagicMock()
-    acc.login = 474607265
+    acc.login = 12345678
     acc.trade_mode = 0  # DEMO
     acc.name = "Standard"
     acc.server = "Exness-MT5Trial15"
@@ -42,7 +42,7 @@ def test_mt5_connection_success(mock_mt5):
     """Test successful initialization and connection."""
     with patch("python_brain.mt5_connect.mt5", mock_mt5):
         connector = MT5Connector(
-            login=474607265,
+            login=12345678,
             password="test_demo_password",
             server="Exness-MT5Trial15",
         )
@@ -51,7 +51,7 @@ def test_mt5_connection_success(mock_mt5):
 
         snapshot = connector.get_account_snapshot()
         assert snapshot is not None
-        assert snapshot.login == 474607265
+        assert snapshot.login == 12345678
         assert snapshot.trade_mode == "DEMO"
         assert snapshot.leverage == 2000
 

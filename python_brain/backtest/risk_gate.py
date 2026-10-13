@@ -4,6 +4,8 @@ Enforces:
 - Compulsory Stop Loss check (zero tolerance for naked trades).
 - Fractional capital risk sizing (0.5% per trade default).
 - Strict daily (-2.0%), weekly (-4.0%), and overall account kill-switch (-12.0%) drawdown blocks.
+- A4: Configurable halt_on_kill_switch (disabled during strategy discovery to measure full history).
+- A8: Strict min-lot risk guard (rejects if forced min_lot exceeds 1.5x risk tolerance).
 - Margin availability and single-position execution guard.
 """
 
@@ -37,6 +39,8 @@ class DefaultRiskGate(RiskGate):
         max_daily_loss_pct: float = 2.0,
         max_weekly_loss_pct: float = 4.0,
         kill_switch_dd_pct: float = 12.0,
+        halt_on_kill_switch: bool = False,  # A4: Disabled during strategy discovery, enabled in live/risk tests
+        max_risk_tolerance_multiplier: float = 1.5,  # A8: Max allowable risk multiplier on forced min-lot
         max_open_positions: int = 1,
         min_lot: float = 0.01,
         max_lot: float = 500.0,
@@ -47,6 +51,8 @@ class DefaultRiskGate(RiskGate):
         self.max_daily_loss_pct = max_daily_loss_pct
         self.max_weekly_loss_pct = max_weekly_loss_pct
         self.kill_switch_dd_pct = kill_switch_dd_pct
+        self.halt_on_kill_switch = halt_on_kill_switch
+        self.max_risk_tolerance_multiplier = max_risk_tolerance_multiplier
         self.max_open_positions = max_open_positions
         self.min_lot = min_lot
         self.max_lot = max_lot
@@ -74,17 +80,17 @@ class DefaultRiskGate(RiskGate):
             return None
 
         # 3. Overall Portfolio Kill-Switch check (-12.0% DD)
-        if account.max_equity_drawdown_pct >= self.kill_switch_dd_pct:
+        if self.halt_on_kill_switch and account.max_equity_drawdown_pct >= self.kill_switch_dd_pct:
             return None
 
         # 4. Daily drawdown limit check (-2.0%)
         daily_loss_pct = abs(min(0.0, account.daily_realized_pnl)) / account.initial_balance * 100.0
-        if daily_loss_pct >= self.max_daily_loss_pct:
+        if self.halt_on_kill_switch and daily_loss_pct >= self.max_daily_loss_pct:
             return None
 
         # 5. Weekly drawdown limit check (-4.0%)
         weekly_loss_pct = abs(min(0.0, account.weekly_realized_pnl)) / account.initial_balance * 100.0
-        if weekly_loss_pct >= self.max_weekly_loss_pct:
+        if self.halt_on_kill_switch and weekly_loss_pct >= self.max_weekly_loss_pct:
             return None
 
         # 6. Lot Sizing based on fixed fractional risk
@@ -111,10 +117,17 @@ class DefaultRiskGate(RiskGate):
         if sized_lot > self.max_lot:
             sized_lot = self.max_lot
 
+        # A8: Min lot risk guard
+        # If forced min_lot causes real risk to exceed max tolerance (e.g. 1.5x target risk), REJECT
+        actual_risk_usd = sized_lot * loss_per_1lot
+        max_allowed_risk_usd = risk_capital_usd * self.max_risk_tolerance_multiplier
+        if actual_risk_usd > max_allowed_risk_usd:
+            return None
+
         # 7. Margin availability check
         required_margin = (execution_price * contract_size * sized_lot) / account.leverage
-        if required_margin > account.free_margin * 0.90:
-            # Insufficient margin to comfortably hold position
+        effective_free_margin = account.free_margin if account.free_margin > 0 else account.balance
+        if required_margin > effective_free_margin * 0.90:
             return None
 
         order = Order(

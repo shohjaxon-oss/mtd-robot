@@ -1,0 +1,13 @@
+{
+  "saved_at_utc": "2026-10-13T11:11:06.569934+00:00",
+  "config": {
+    "exp_id": "HYP01_V2",
+    "hypo_id": "HYP-01",
+    "params": {
+      "entry_window_hours": 3,
+      "rr_ratio": 2.0,
+      "atr_sl_mult": 1.5
+    },
+    "timeframe": "H1"
+  }
+}

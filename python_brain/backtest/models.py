@@ -92,18 +92,24 @@ class AccountState:
     current_day: Optional[str] = None
     current_week: Optional[str] = None
 
+    # Kill-switch audit tracking (A4)
+    kill_switch_triggered: bool = False
+    kill_switch_triggered_at: Optional[datetime] = None
+
     open_positions: List[Position] = field(default_factory=list)
     closed_positions: List[Position] = field(default_factory=list)
 
-    def update_peak(self) -> None:
+    def update_peak(self, current_time: Optional[datetime] = None, intrabar_worst_equity: Optional[float] = None) -> None:
         if self.equity > self.peak_equity:
             self.peak_equity = self.equity
         if self.balance > self.peak_balance:
             self.peak_balance = self.balance
 
-        # Calculate current DDs
+        # A6: Intrabar worst equity or close equity for maximum realistic DD
+        evaluated_equity = intrabar_worst_equity if (intrabar_worst_equity is not None and intrabar_worst_equity < self.equity) else self.equity
+
         if self.peak_equity > 0:
-            dd_eq = (self.peak_equity - self.equity) / self.peak_equity * 100.0
+            dd_eq = (self.peak_equity - evaluated_equity) / self.peak_equity * 100.0
             if dd_eq > self.max_equity_drawdown_pct:
                 self.max_equity_drawdown_pct = dd_eq
 
@@ -111,3 +117,8 @@ class AccountState:
             dd_bal = (self.peak_balance - self.balance) / self.peak_balance * 100.0
             if dd_bal > self.max_balance_drawdown_pct:
                 self.max_balance_drawdown_pct = dd_bal
+
+        # A4: Record first kill-switch trigger timestamp
+        if not self.kill_switch_triggered and self.max_equity_drawdown_pct >= 12.0:
+            self.kill_switch_triggered = True
+            self.kill_switch_triggered_at = current_time

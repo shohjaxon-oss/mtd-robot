@@ -134,3 +134,26 @@ class CalendarLoader:
         df_sample = pd.DataFrame(sample_rows)
         df_sample.to_csv(path, index=False)
         return path
+
+
+class NewsCalendar:
+    """Helper wrapper for fast blackout checks in BacktestEngine and Live Trading."""
+
+    def __init__(self, df: Optional[pd.DataFrame] = None, high_impact_times: Optional[List[datetime]] = None):
+        self.high_impact_times: List[pd.Timestamp] = []
+        if df is not None and not df.empty:
+            high_df = df[df["is_high_impact"] == True] if "is_high_impact" in df.columns else df
+            self.high_impact_times = [pd.to_datetime(t, utc=True) for t in high_df["time_utc"]]
+        elif high_impact_times:
+            self.high_impact_times = [pd.to_datetime(t, utc=True) for t in high_impact_times]
+
+    def is_blackout(self, time_utc: datetime, before_minutes: int = 15, after_minutes: int = 15) -> bool:
+        t = pd.to_datetime(time_utc, utc=True)
+        before_delta = pd.Timedelta(minutes=before_minutes)
+        after_delta = pd.Timedelta(minutes=after_minutes)
+
+        for event_t in self.high_impact_times:
+            if (event_t - before_delta) <= t <= (event_t + after_delta):
+                return True
+        return False
+

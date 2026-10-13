@@ -1,0 +1,156 @@
+{
+  "ambiguous_bars": {
+    "H1": {
+      "total_bars": 46125,
+      "ambiguous_bars": 4045,
+      "ambiguous_pct": 8.7696,
+      "required_range_usd": 9.0
+    },
+    "M15": {
+      "total_bars": 80000,
+      "ambiguous_bars": 16172,
+      "ambiguous_pct": 20.215,
+      "required_range_usd": 4.5
+    },
+    "M5": {
+      "total_bars": 80001,
+      "ambiguous_bars": 49954,
+      "ambiguous_pct": 62.4417,
+      "required_range_usd": 3.0
+    }
+  },
+  "random_entry_battery": {
+    "num_seeds": 30,
+    "zero_cost_mean_expectancy": -1.2,
+    "zero_cost_ci_95": [
+      -2.83,
+      0.43
+    ],
+    "zero_includes_zero": true,
+    "real_cost_mean_expectancy": -4.97,
+    "real_cost_ci_95": [
+      -7.16,
+      -2.77
+    ],
+    "avg_friction_per_trade": 1.02
+  },
+  "ma_crossover_h1": {
+    "zero_cost": {
+      "initial_balance": 10000.0,
+      "final_balance": 5249.0,
+      "final_equity": 5249.0,
+      "net_profit": -4751.0,
+      "return_pct": -47.51,
+      "total_trades": 1608,
+      "winning_trades": 496,
+      "losing_trades": 1112,
+      "winrate_pct": 30.85,
+      "profit_factor": 0.87,
+      "max_equity_drawdown_pct": 48.44,
+      "max_balance_drawdown_pct": 48.25,
+      "sharpe_ratio": -2.57,
+      "sortino_ratio": -19.33,
+      "recovery_factor": -0.98,
+      "expectancy_usd": -2.95,
+      "avg_duration_hours": 6.64,
+      "total_spread_cost": 0.0,
+      "total_swap_cost": 0.0,
+      "total_commission": 0.0
+    },
+    "real_cost": {
+      "initial_balance": 10000.0,
+      "final_balance": 1702.5,
+      "final_equity": 1702.5,
+      "net_profit": -8297.5,
+      "return_pct": -82.97,
+      "total_trades": 1613,
+      "winning_trades": 476,
+      "losing_trades": 1137,
+      "winrate_pct": 29.51,
+      "profit_factor": 0.67,
+      "max_equity_drawdown_pct": 83.22,
+      "max_balance_drawdown_pct": 83.2,
+      "sharpe_ratio": -6.8,
+      "sortino_ratio": -16.15,
+      "recovery_factor": -1.0,
+      "expectancy_usd": -5.14,
+      "avg_duration_hours": 6.55,
+      "total_spread_cost": 2179.41,
+      "total_swap_cost": -1109.92,
+      "total_commission": 0.0
+    },
+    "kill_switch_triggered_at": "2017-03-15 20:00:00"
+  },
+  "ma_crossover_m15": {
+    "zero_cost": {
+      "initial_balance": 10000.0,
+      "final_balance": 3632.89,
+      "final_equity": 3632.89,
+      "net_profit": -6367.11,
+      "return_pct": -63.67,
+      "total_trades": 2835,
+      "winning_trades": 884,
+      "losing_trades": 1950,
+      "winrate_pct": 31.18,
+      "profit_factor": 0.91,
+      "max_equity_drawdown_pct": 65.6,
+      "max_balance_drawdown_pct": 65.48,
+      "sharpe_ratio": -2.28,
+      "sortino_ratio": -14.15,
+      "recovery_factor": -0.97,
+      "expectancy_usd": -2.25,
+      "avg_duration_hours": 0.97,
+      "total_spread_cost": 0.0,
+      "total_swap_cost": 0.0,
+      "total_commission": 0.0
+    },
+    "real_cost": {
+      "initial_balance": 10000.0,
+      "final_balance": 244.45,
+      "final_equity": 244.45,
+      "net_profit": -9755.55,
+      "return_pct": -97.56,
+      "total_trades": 2846,
+      "winning_trades": 824,
+      "losing_trades": 2022,
+      "winrate_pct": 28.95,
+      "profit_factor": 0.68,
+      "max_equity_drawdown_pct": 97.58,
+      "max_balance_drawdown_pct": 97.58,
+      "sharpe_ratio": -7.37,
+      "sortino_ratio": -13.03,
+      "recovery_factor": -1.0,
+      "expectancy_usd": -3.43,
+      "avg_duration_hours": 0.93,
+      "total_spread_cost": 4841.42,
+      "total_swap_cost": -517.02,
+      "total_commission": 0.0
+    },
+    "kill_switch_triggered_at": "2022-08-03 02:45:00"
+  },
+  "ma_crossover_m5": {
+    "real_cost": {
+      "initial_balance": 10000.0,
+      "final_balance": 97.29,
+      "final_equity": 97.29,
+      "net_profit": -9902.71,
+      "return_pct": -99.03,
+      "total_trades": 2008,
+      "winning_trades": 498,
+      "losing_trades": 1510,
+      "winrate_pct": 24.8,
+      "profit_factor": 0.52,
+      "max_equity_drawdown_pct": 99.03,
+      "max_balance_drawdown_pct": 99.03,
+      "sharpe_ratio": -10.05,
+      "sortino_ratio": -15.86,
+      "recovery_factor": -1.0,
+      "expectancy_usd": -4.93,
+      "avg_duration_hours": 0.07,
+      "total_spread_cost": 3561.14,
+      "total_swap_cost": -28.26,
+      "total_commission": 0.0
+    },
+    "kill_switch_triggered_at": "2025-05-20 07:45:00"
+  }
+}
