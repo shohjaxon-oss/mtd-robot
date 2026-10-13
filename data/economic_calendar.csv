@@ -1,0 +1,4 @@
+event_id,time_broker,currency,event_name,importance,actual_value,forecast_value,previous_value,revised_value
+1001,2026-09-04 12:30:00,USD,Non-Farm Employment Change,High,142000.0,165000.0,114000.0,89000.0
+1002,2026-09-11 12:30:00,USD,CPI m/m,High,0.2,0.2,0.2,0.2
+1003,2026-09-18 18:00:00,USD,FOMC Statement & Federal Funds Rate,High,5.0,5.0,5.25,5.25

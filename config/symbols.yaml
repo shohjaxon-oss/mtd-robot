@@ -1,0 +1,45 @@
+symbol:
+  base_symbol: XAUUSDm
+  description: Gold vs US Dollar (OTC Spot)
+  candidate_symbols:
+  - XAUUSD
+  - XAUUSDm
+  - XAUUSD.c
+  expected_contract_size: 100.0
+  primary_timeframe: M5
+  supported_timeframes:
+  - M1
+  - M5
+  - M15
+  - H1
+  - H4
+  - D1
+  execution:
+    max_slippage_points: 30
+    magic_number: 777101
+    order_comment: MTD-Robot-v1
+  schedule:
+    timezone: UTC
+    avoid_weekend_close_minutes: 60
+    avoid_market_open_minutes: 30
+    trade_sessions:
+    - name: london
+      start_utc: 07:00
+      end_utc: '16:00'
+    - name: new_york
+      start_utc: '12:00'
+      end_utc: '21:00'
+  active_symbol: XAUUSDm
+  path: Standard\Forex\XAUUSDm
+  digits: 3
+  point: 0.001
+  tick_size: 0.001
+  tick_value: 0.1
+  volume_min: 0.01
+  volume_max: 200.0
+  volume_step: 0.01
+  stops_level: 0
+  swap_mode: Points
+  swap_long_usd_per_lot: -52.33
+  swap_short_usd_per_lot: 0.0
+  triple_swap_day: Thursday

@@ -1,0 +1,30 @@
+# ==============================================================================
+# MTD-ROBOT SYSTEM SETTINGS
+# ==============================================================================
+app:
+  name: "mtd-robot"
+  version: "0.1.0"
+  environment: "development" # development | staging | production
+  timezone: "UTC"
+
+mt5:
+  timeout_ms: 60000
+  portable: false
+  reconnect_retries: 3
+  reconnect_delay_seconds: 5
+
+logging:
+  level: "INFO"              # DEBUG | INFO | WARNING | ERROR | CRITICAL
+  log_to_console: true
+  log_to_file: true
+  file_path: "logs/trading.log"
+  rotation: "10 MB"
+  retention: "30 days"
+  compression: "zip"
+  mask_secrets: true
+
+bridge:
+  protocol: "zmq"
+  host: "127.0.0.1"
+  heartbeat_interval_seconds: 1.0
+  heartbeat_timeout_seconds: 5.0

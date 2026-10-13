@@ -1,0 +1,31 @@
+# ==============================================================================
+# MTD-ROBOT RISK ENGINE RULES (Phase 6/10 Foundation)
+# Qat'iy qoidalar: Martingale, grid, averaging-down, SL siz pozitsiya TAQIQLANGAN.
+# ==============================================================================
+
+# Per-trade risk limits (foizda)
+per_trade_risk:
+  risk_per_trade_pct: 0.5            # Standart savdo xatari: 0.5%
+  max_allowed_risk_per_trade_pct: 1.0 # Qat'iy chegara (1.0% dan oshirilsa validatsiya xatosi beradi)
+  require_stop_loss: true            # Stop loss majburiy
+
+# Portfel va hisob darajasidagi drawdown cheklovlari
+drawdown_limits:
+  daily_loss_limit_pct: 2.0          # Kunlik maksimal zarar: 2.0% (shu kungi savdolar to'xtatiladi)
+  weekly_loss_limit_pct: 4.0         # Haftalik maksimal zarar: 4.0%
+  max_drawdown_kill_switch_pct: 12.0 # Umumiy portfel kill-switch: 12.0% (bot to'liq to'xtaydi)
+
+# Pozitsiyalar va buyurtmalar hajmi cheklovlari
+execution_limits:
+  max_open_positions: 1              # Bir vaqtning o'zida maksimal ochiq savdolar soni
+  max_daily_trades: 5                # Kunlik maksimal bitimlar soni (overtrading oldini olish)
+  consecutive_losses_cooldown_trades: 3 # 3 marta ketma-ket zarardan keyin pauza
+  cooldown_duration_minutes: 60      # Pauza davomiyligi (daqiqa)
+  max_spread_points: 40.0            # Maksimal ruxsat etilgan spread (points)
+  min_risk_reward_ratio: 1.5         # Minimal R:R nisbati
+
+# Qat'iy taqiqlangan strategiyalar bayroqlari (har doim false bo'lishi shart)
+forbidden_mechanics:
+  allow_martingale: false
+  allow_grid: false
+  allow_averaging_down: false
