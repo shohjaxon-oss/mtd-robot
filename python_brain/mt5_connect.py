@@ -174,6 +174,22 @@ class MT5Connector:
         self.is_connected = True
         return True
 
+    def initialize(self) -> bool:
+        """Alias for connect() for standard API consistency."""
+        return self.connect()
+
+    def login(self) -> bool:
+        """Alias checking connection and authentication status."""
+        return self.is_connected or self.connect()
+
+    def get_account_info(self) -> Any:
+        """Fetch MT5 AccountInfo object (or fallback to AccountSnapshot)."""
+        if mt5 is not None:
+            acc = mt5.account_info()
+            if acc is not None:
+                return acc
+        return self.get_account_snapshot()
+
     def get_account_snapshot(self) -> Optional[AccountSnapshot]:
         """Fetch current account status, balance, equity, and leverage."""
         if not self.is_connected:

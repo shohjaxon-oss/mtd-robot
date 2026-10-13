@@ -272,15 +272,15 @@ def run_experiment(exp_id: str, tf: str, params: dict, df_train: pd.DataFrame) -
     mc_median_dd = 0.0
     mc_p95_dd = 0.0
     mc_ruin_prob = 0.0
-    mc_drop10_pf = 0.0
+    mc_drop10_pnl = 0.0
 
     if len(acc_1_0.closed_positions) >= 20:
-        mc = MonteCarloEngine(n_simulations=1000, random_seed=42)
-        mc_res = mc.run(acc_1_0.closed_positions, initial_balance=10000.0)
-        mc_median_dd = round(mc_res.median_drawdown_pct, 2)
-        mc_p95_dd = round(mc_res.p95_drawdown_pct, 2)
-        mc_ruin_prob = round(mc_res.risk_of_ruin_pct, 2)
-        mc_drop10_pf = round(mc_res.drop_top_10pct_pf, 2)
+        mc = MonteCarloEngine(initial_balance=10000.0)
+        mc_res = mc.analyze(acc_1_0.closed_positions, iterations=1000, random_seed=42)
+        mc_median_dd = round(mc_res.dd_p50, 2)
+        mc_p95_dd = round(mc_res.dd_p95, 2)
+        mc_ruin_prob = round(mc_res.ruin_probability, 2)
+        mc_drop10_pnl = round(mc_res.drop_10pct_wins_pnl, 2)
 
     # Gate verification (TZ 1-bo'lim)
     passed_gate = (
@@ -323,7 +323,7 @@ def run_experiment(exp_id: str, tf: str, params: dict, df_train: pd.DataFrame) -
         "mc_median_dd": mc_median_dd,
         "mc_p95_dd": mc_p95_dd,
         "mc_ruin_prob": mc_ruin_prob,
-        "mc_drop10_pf": mc_drop10_pf,
+        "mc_drop10_wins_pnl": mc_drop10_pnl,
         "pf_ci_lower": m_1_0["pf_ci_lower"],
         "pf_ci_upper": m_1_0["pf_ci_upper"],
         "leg_a_pnl": m_1_0["leg_a_pnl"],

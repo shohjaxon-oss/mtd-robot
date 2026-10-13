@@ -77,3 +77,10 @@ class LiveGuard:
             raise LiveTradingBlockedError("XAVFSIZLIK: require_demo_trade_mode yoqilgan, faqat DEMO hisoblarga ruxsat!")
 
         return True
+
+
+def validate_demo_account(account_info: Any, allow_live: bool = False) -> bool:
+    """Helper funksiya: account_info obyekti bo'yicha DEMO hisobni tasdiqlaydi."""
+    guard = LiveGuard(allow_live=allow_live, require_demo=not allow_live)
+    return guard.verify_account(account_info)
+
