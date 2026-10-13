@@ -1,0 +1,9 @@
+{
+  "saved_at_utc": "2026-10-13T10:29:02.336222+00:00",
+  "config": {
+    "run_id": "baseline_h1_random_zero_cost",
+    "timeframe": "H1",
+    "use_costs": false,
+    "bars_count": 46125
+  }
+}

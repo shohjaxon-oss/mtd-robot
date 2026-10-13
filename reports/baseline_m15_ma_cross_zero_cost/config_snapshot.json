@@ -1,0 +1,9 @@
+{
+  "saved_at_utc": "2026-10-13T10:28:21.467745+00:00",
+  "config": {
+    "run_id": "baseline_m15_ma_cross_zero_cost",
+    "timeframe": "M15",
+    "use_costs": false,
+    "bars_count": 80000
+  }
+}

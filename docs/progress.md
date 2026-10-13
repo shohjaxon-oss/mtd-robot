@@ -1,7 +1,7 @@
 # MTD-ROBOT Loyiha Taraqqiyoti (Progress Tracker)
 
-> **Joriy Bosqich:** 2/10 — Data Layer (Yakunlandi)  
-> **Oxirgi yangilanish:** 2026-10-12  
+> **Joriy Bosqich:** 3/10 — Backtest Engine va Xarajat Modeli (Yakunlandi)  
+> **Oxirgi yangilanish:** 2026-10-13  
 > **Broker / Server:** Exness (`Exness-MT5Trial15`), Demo Standard  
 > **Faol Instrument:** `XAUUSDm` (Digits: 3, Point: 0.001)
 
@@ -13,8 +13,8 @@
 |---|---|---|---|---|
 | 1 | **Poydevor va spetsifikatsiyani qulflash** | ✅ Yopildi | ✅ O'tdi | Muhit, tuzilma, config, logging, MT5 ulanish, testlar |
 | 2 | **Data layer (Tarixiy ma'lumot, sifat, profil)** | ✅ Yopildi | ✅ O'tdi | M1-D1 ma'lumot Parquet'da, sifat hisoboti, spread modeli |
-| 3 | Backtest engine va xarajat modeli | 🔄 Keyingi | Kutilmoqda | Event-driven, slippage, spread profili, Monte Carlo |
-| 4 | Strategiya tadqiqoti va validatsiya | ⏳ Kutilmoqda | - | 3-5 g'oya, out-of-sample edge tekshiruvi |
+| 3 | **Backtest engine va xarajat modeli** | ✅ Yopildi | ✅ O'tdi | Event-driven, Bid/Ask, SL-first, Monte Carlo, Holdout qulfi, WFO |
+| 4 | Strategiya tadqiqoti va validatsiya | 🔄 Keyingi | Kutilmoqda | 3-5 g'oya, out-of-sample edge tekshiruvi |
 | 5 | Signal engine, rejim aniqlash, yangilik filtri | ⏳ Kutilmoqda | - | Real-vaqt signallari, yangilik filtri |
 | 6 | Risk engine (eng muhim modul) | ⏳ Kutilmoqda | - | 0.5% risk, kill-switch, lot hisoblash |
 | 7 | MQL5 EA ijro qatlami va ko'prik | ⏳ Kutilmoqda | - | Terminal ichidagi himoya qalqoni |
@@ -52,14 +52,45 @@
 
 ---
 
-## 2/10 Gate Mezonlari
+## 3/10 Bosqich Bajarilgan Vazifalar
+- [x] **A Bandi: Tarix chegarasi va arxivator:**
+  - `downloader.py` da hech qanday qattiq chegara (`count=100000`) yo'qligi tekshirildi va tasdiqlandi.
+  - To'g'ridan-to'g'ri `copy_rates_range` so'rovi bilan broker serverida eski M1/M5 tarixi yo'qligi isbotlandi (0 bar qaytdi).
+  - ADR-0007 yangilandi.
+  - `scripts/archive_recent.py` yozildi va sinovdan o'tkazildi (+50k M1 bar, +1.15M tick arxivlandi).
+  - `docs/runbook.md` ga Windows Task Scheduler orqali haftalik avto-arxivlash yo'riqnomasi kiritildi.
+- [x] **B Bandi: Backtest Engine arxitekturasi:**
+  - Event-driven arxitektura (`engine.py`, `models.py`): Zero-Lookahead (Signal bar t close -> Execution bar t+1 open).
+  - Bid/Ask narxlar modeli: Buy ochilishi Ask da, yopilishi Bid da; Sell ochilishi Bid da, yopilishi Ask da.
+  - Konservativ intrabar to'qnashuv: bitta bar ichida ham SL, ham TP tegsa, har doim SL birinchi ijro etiladi.
+  - Stop-Out mexanikasi: 20% margin levelda barcha ochiq pozitsiyalar yopiladi.
+- [x] **C Bandi: Xarajatlar modeli (`costs.py`):**
+  - Soatlik va sessiyaviy spread profili (median va p95).
+  - Rollover (21:00-22:00 UTC) va news blackout davrida kengayish.
+  - Stop-Loss ijrosiga dinamik slippage (spread va ATR ga mutanosib).
+  - Overnight swap: Long (-52.33 USD/lot), Short (0.0 USD), Payshanba kechasi 3x swap.
+- [x] **D Bandi: Xavfsizlik va RiskGate (`risk_gate.py`):**
+  - Majburiy Stop-Loss (SL siz orderlar rad etiladi).
+  - 0.5% risk kapitali bo'yicha dinamik lot o'lchami.
+  - Kunlik (-2.0%) va haftalik (-4.0%) zarar bloklari.
+  - Kill-switch: -12.0% equity drawdown yetganda yangi orderlar to'xtatiladi.
+- [x] **E Bandi: Overfittingga qarshi himoya:**
+  - Holdout qulfi (`holdout.py`): har bir timeframe uchun oxirgi 20% qulflangan, audit jurnali `docs/holdout_log.md` ga yoziladi.
+  - Monte Carlo Engine (`montecarlo.py`): 1000 iteratsiya bootstrap reshuffle, Median DD, 95% DD, Ruin ehtimoli, cost stress (1.0x, 1.5x, 2.0x), 10% eng yaxshi yutuqlarni olib tashlash.
+  - Walk-Forward Splitter va Analyzer (`walkforward.py`): H1 (18 ta rolling oyna), M15.
+- [x] **F Bandi: Baseline va Hisobotlar (`reporter.py`, `scripts/run_baseline_backtest.py`):**
+  - MA Crossover va Random Entry (H1 va M15, Zero Cost va Real Cost).
+  - `reports/<run_id>/` da `trades.csv`, `metrics.json`, `report.md`, `equity_curve.png`, `config_snapshot.json` yaratildi.
+  - 41 ta to'liq avtomatik pytest testlari (100% yashil).
 
-1. **`pytest` hammasi yashil:** ✅ **28/28 test yashil** (`0.38s`).
-2. **Haqiqiy raqamlar bilan hujjatlar:** ✅
-   - `docs/data_availability.md`
-   - `docs/data_quality.md`
-   - `docs/spread_profile.md`
-   - `docs/decisions.md` (ADR-0005, ADR-0006, ADR-0007)
-   - `docs/runbook.md`
-3. **M1 va M5 brokerdagi maksimal tarix:** ✅ M1 (100,000 bar), M5 (100,002 bar) to'liq yuklangan va UTC ga o'tkazilgan.
-4. **Kalendar CSV va yuklovchi:** ✅ Tayyor.
+---
+
+## 3/10 Gate Mezonlari
+
+1. **`pytest` barcha testlar yashil:** ✅ **41/41 test yashil** (`1.14s`).
+2. **Zero-lookahead qat'iy isboti:** ✅ Testlangan (`test_zero_lookahead_execution`).
+3. **Konservativ intrabar ziddiyat:** ✅ Testlangan (`test_intrabar_conservative_sl_tp`).
+4. **Haqiqiy xarajatlar va stress-test:** ✅ Empirik profil, 3x swap, Monte Carlo 1.5x/2.0x stress.
+5. **Holdout qulfi mavjud:** ✅ Oxirgi 20% qulflangan, `docs/holdout_log.md` audit jurnali sozlangan.
+6. **Baseline hisobotlari:** ✅ `reports/` katalogida barcha 6 ta eksperiment hisoboti to'liq mavjud.
+
