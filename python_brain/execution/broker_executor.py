@@ -76,6 +76,11 @@ class ExecutionResult:
     def __bool__(self) -> bool:
         return self.success
 
+    @property
+    def slippage_points(self) -> float:
+        return self.slippage_pts
+
+
 
 OrderExecutionResult = ExecutionResult
 
@@ -93,10 +98,12 @@ class MT5BrokerExecutor:
         allow_live: bool = False,
         live_guard: Optional[LiveGuard] = None,
         mt5_client: Optional[Any] = None,
+        slippage_points: Optional[int] = None,
+        **kwargs: Any,
     ) -> None:
         self.symbol = symbol
         self.magic_number = magic_number
-        self.default_deviation_pts = default_deviation_pts
+        self.default_deviation_pts = slippage_points if slippage_points is not None else default_deviation_pts
         self.max_retries = max_retries
         self.retry_delay_seconds = retry_delay_seconds
         self.live_guard = live_guard or LiveGuard(allow_live=allow_live, require_demo=True)
@@ -346,3 +353,37 @@ class MT5BrokerExecutor:
         err_code = getattr(res, "retcode", -1) if res else -1
         logger.error(f"Pozitsiya #{ticket} yopilmadi: retcode={err_code} ({err_msg})")
         return ExecutionResult(success=False, retcode=err_code, comment=f"Failed to close: {err_msg}")
+
+    def modify_position_sl_tp(self, ticket: int, sl: float, tp: Optional[float] = None) -> ExecutionResult:
+        """Modifies Stop Loss and Take Profit of an existing open position."""
+        self._ensure_connected()
+        positions = self._mt5.positions_get(ticket=ticket)
+        if not positions:
+            logger.warning(f"Modifikatsiya uchun #{ticket} pozitsiyasi topilmadi.")
+            return ExecutionResult(success=False, retcode=10013, comment=f"Position #{ticket} not found")
+
+        pos = positions[0]
+        current_tp = tp if tp is not None else pos.tp
+
+        request = {
+            "action": 6,  # TRADE_ACTION_SLTP
+            "position": ticket,
+            "symbol": pos.symbol,
+            "sl": float(sl),
+            "tp": float(current_tp),
+        }
+
+        res = self._mt5.order_send(request)
+        if res and res.retcode in [RETCODE_DONE, RETCODE_PLACED]:
+            logger.success(f"Pozitsiya #{ticket} SL/TP yangilandi: SL={sl}, TP={current_tp}")
+            return ExecutionResult(
+                success=True,
+                retcode=res.retcode,
+                comment=res.comment,
+                ticket=ticket,
+            )
+        err_msg = getattr(res, "comment", "Unknown order_send error")
+        err_code = getattr(res, "retcode", -1) if res else -1
+        logger.error(f"Pozitsiya #{ticket} SL/TP yangilanmadi: retcode={err_code} ({err_msg})")
+        return ExecutionResult(success=False, retcode=err_code, comment=f"Failed to modify SL/TP: {err_msg}")
+

@@ -56,7 +56,21 @@ class ProductionRiskGate:
         state_store: Optional[RiskStateStore] = None,
         live_guard: Optional[LiveGuard] = None,
         halt_on_kill_switch: bool = True,
+        risk_config: Optional[Any] = None,
+        **kwargs: Any,
     ) -> None:
+        if risk_config is not None:
+            if hasattr(risk_config, "per_trade_risk"):
+                risk_per_trade_pct = getattr(risk_config.per_trade_risk, "max_allowed_risk_per_trade_pct", risk_per_trade_pct)
+            if hasattr(risk_config, "drawdown_limits"):
+                daily_loss_limit_pct = getattr(risk_config.drawdown_limits, "max_daily_loss_pct", daily_loss_limit_pct)
+                weekly_loss_limit_pct = getattr(risk_config.drawdown_limits, "max_weekly_loss_pct", weekly_loss_limit_pct)
+                kill_switch_dd_pct = getattr(risk_config.drawdown_limits, "kill_switch_total_drawdown_pct", kill_switch_dd_pct)
+            if hasattr(risk_config, "execution_limits"):
+                max_daily_trades = getattr(risk_config.execution_limits, "max_daily_trades", max_daily_trades)
+                consecutive_losses_cooldown = getattr(risk_config.execution_limits, "consecutive_losses_cooldown", consecutive_losses_cooldown)
+                cooldown_minutes = getattr(risk_config.execution_limits, "cooldown_minutes", cooldown_minutes)
+
         self.risk_per_trade_pct = risk_per_trade_pct
         self.daily_loss_limit_pct = daily_loss_limit_pct
         self.weekly_loss_limit_pct = weekly_loss_limit_pct

@@ -54,9 +54,16 @@ def setup_logger(
     rotation: str = "10 MB",
     retention: str = "30 days",
     mask_secrets: bool = True,
+    log_to_file: bool = True,
+    log_file_path: Optional[str] = None,
+    **kwargs: Any,
 ) -> Any:
     """Configure Loguru logger with console and rotating file output."""
     logger.remove()
+
+    effective_file = log_file_path or log_file
+    if not log_to_file:
+        effective_file = None
 
     # Automatically register secrets from environment variables
     if mask_secrets:
@@ -80,8 +87,8 @@ def setup_logger(
     )
 
     # File sink (if specified)
-    if log_file:
-        log_path = Path(log_file)
+    if effective_file:
+        log_path = Path(effective_file)
         log_path.parent.mkdir(parents=True, exist_ok=True)
         logger.add(
             str(log_path),

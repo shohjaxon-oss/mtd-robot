@@ -167,6 +167,10 @@ class SymbolDetailsConfig(BaseModel):
 class SymbolsConfig(BaseModel):
     symbol: SymbolDetailsConfig
 
+    @property
+    def primary_symbol(self) -> str:
+        return self.symbol.base_symbol
+
 
 # --------------------------------------------------------------------------
 # ENVIRONMENT VARIABLES CONFIGURATION (.env)

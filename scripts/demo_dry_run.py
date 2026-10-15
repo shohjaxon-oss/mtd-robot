@@ -37,13 +37,16 @@ def run_demo_dry_run():
     # 1. Load config
     configs = load_all_configs(config_dir="config")
     allow_live = configs.settings.safety.allow_live
-    symbol = configs.symbols.primary_symbol
+    env_sym = configs.env.PRIMARY_SYMBOL
 
     # 2. Connect to MT5
     connector = MT5Connector()
     if not connector.initialize() or not connector.login():
         logger.error("MT5 ga ulanib bo'lmadi! Terminal ochiqligini tekshiring.")
         sys.exit(1)
+
+    # Auto-discover active symbol (e.g. XAUUSD vs XAUUSDm)
+    symbol = connector.find_actual_symbol([env_sym, configs.symbols.primary_symbol, "XAUUSD", "XAUUSDm"]) or env_sym or "XAUUSD"
 
     try:
         # 3. LIVE GUARD (Strict enforcement)

@@ -147,8 +147,39 @@ Strategiya tadqiqotidan mustaqil, mustahkam va xavfsiz ijro infratuzilmasi to'li
   - `python_brain/signals/pipeline_test.py`: "FOYDA UCHUN EMAS, FAQAT QUVUR SINOVI" (0.01 lot, ATR SL/TP, faqat demo).
 - [x] **7. Testlar va Dry-Run:**
   - Mock MT5 bilan ulanish uzilishi, barcha retcode'lar, dublikatlar, reconciliation, kill-switch reset, heartbeat testlandi.
-  - `scripts/demo_dry_run.py`: Demo hisobda 0.01 lot savdoni ochib, server SL/TP tekshirib, yopuvchi sinov skripti.
-  - Jami testlar: **87/87 test 100% yashil** (`pytest`).
+  - `scripts/demo_dry_run.py`: Demo hisobda 0.01 lot savdoni ochib, server SL/TP tekshirib, yopuvchi sinov skripti (MetaQuotes-Demo da muvaffaqiyatli tekshirildi).
+  - Jami testlar: **102/102 test 100% yashil** (`pytest`).
+
+---
+
+## HYP-09 / ADR-0013: "FU FORMATION" Strategiyasi Tadqiqoti Natijalari
+
+> **Pre-registered Gipoteza:** HYP-09  
+> **ADR:** ADR-0013 (FU Formation va Multi-Leg Breakeven Arxitekturasi)  
+> **Status:** ❌ Gate Rad Etildi (No Edge)
+
+### Amalga Oshirilgan Ishlar:
+1. **Multi-Leg va Breakeven Dvigateli:** `engine.py`, `models.py`, `risk_gate.py` ga atomik 2-leg ijrosi (Leg A TP 20 pip, Leg B TP 30 pip) va birinchi TP dan keyin Breakeven ko'chirish joriy qilindi. 15 ta yangi test yozilib, 102/102 test yashil.
+2. **M3 Ma'lumot Qatlami:** M1 dan UTC ga tekislangan 33,388 barli M3 resampled dataset yaratildi.
+3. **8 Ta To'liq Ilmiy Tajriba:** M5, M3, M1 timeframelarda Backtest + Zero-Cost + Stress 1.5x/2.0x + Walk-Forward (WFO) + Monte Carlo (1000 iteratsiya) o'tkazildi.
+
+### Xulosa Jadvali (Train/Dev 80%):
+| Exp ID | TF | Min Trend | Engulf | Savdolar | Gross PF | Net PF | Stress 1.5x | Net PnL | Max DD | WFO OOS PF | Holat |
+|---|---|---|---|---|---|---|---|---|---|---|---|
+| `HYP09_M5_PURE` | M5 | 3 | body | 8,110 | 0.53 | 0.42 | 0.40 | -$8,831.72 | 88.33% | 0.39 | ❌ Rad |
+| `HYP09_M3_PURE` | M3 | 3 | body | 2,600 | 0.63 | 0.46 | 0.42 | -$2,399.71 | 24.05% | 0.49 | ❌ Rad |
+| `HYP09_M1_PURE` | M1 | 3 | body | 6,686 | 0.82 | 0.60 | 0.53 | -$3,569.91 | 35.75% | 0.59 | ❌ Rad |
+| `HYP09_M5_V1` | M5 | 4 | body | 4,028 | 0.52 | 0.40 | 0.38 | -$4,561.21 | 45.62% | 0.37 | ❌ Rad |
+| `HYP09_M5_V2` | M5 | 3 | range | 7,278 | 0.54 | 0.42 | 0.39 | -$7,911.26 | 79.11% | 0.39 | ❌ Rad |
+| `HYP09_M5_V3` | M5 | 4 | range | 3,342 | 0.53 | 0.41 | 0.39 | -$3,634.95 | 36.34% | 0.38 | ❌ Rad |
+| `HYP09_M3_V1` | M3 | 4 | body | 1,234 | 0.62 | 0.47 | 0.43 | -$1,123.74 | 11.30% | 0.50 | ❌ Rad |
+| `HYP09_M1_V1` | M1 | 4 | body | 3,230 | 0.82 | 0.61 | 0.52 | -$1,720.69 | 17.25% | 0.60 | ❌ Rad |
+
+### Diagnostika va Rad Etilish Sabablari:
+1. **Gross PF < 1.0 (Sof Narxda Ham Manfiy):** Xarajatlar (spread/slippage) hisobga olinmaganda ham Gross PF 0.52 – 0.82 oralig'ida bo'ldi. Bu strategiyaning o'zida sof matematik ustunlik yo'qligini (No Edge) ko'rsatadi.
+2. **R:R Nomutanosibligi:** Dinamik SL (FU wick + 5 pip) o'rtacha 25 – 45 pip masofada bo'lgan, TP esa qat'iy 20 va 30 pip qilib belgilangan. Natijada real R:R = 0.76 – 0.83 ga teng bo'lib, zararsiz chiqish uchun kamida 55-57% Winrate talab qilingan. Haqiqiy Winrate esa atigi ~35% ni tashkil qilgan.
+3. **Qoidalar daxlsizligi:** Trader talabiga ko'ra, sun'iy filtrlar yoki curve-fitting qilinmadi. Holdout (oxirgi 20%) qulflangan holatda saqlandi.
+
 
 
 

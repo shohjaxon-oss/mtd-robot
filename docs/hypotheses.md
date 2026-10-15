@@ -185,4 +185,16 @@
   - M1/M3/M5 da yuqori chastotali signallar beradi. Oltinda o'rtacha spread 1.6 pip bo'lgani sababli, 20 pip TP da spread xarajati ~8% ni tashkil qiladi. Breakeven ga o'tkazish xavfni kamaytiradi, lekin ko'p sonli savdolarni nolga (spread xarajati bilan kichik ziyon) yopishi mumkin.
 - **Rad Etish Sharti (Rejection Criteria):**
   - OOS Profit Factor < 1.3 yoki 1.5x xarajat stressida PF < 1.15 bo'lsa, gipoteza rad etiladi.
+- **Validatsiya Natijasi (2026-10-13):**
+  - **Holati:** ❌ QAT'IY RAD ETILDI (REJECTED).
+  - **Natijalar:**
+    - M5 Pure (8,110 savdo): Gross PF = 0.53, Net PF = 0.42, 1.5x Stress PF = 0.40, Net PnL = -$8,831.72, Max DD = 88.33%, WFO OOS PF = 0.39.
+    - M3 Pure (2,600 savdo): Gross PF = 0.63, Net PF = 0.46, 1.5x Stress PF = 0.42, Net PnL = -$2,399.71, Max DD = 24.05%, WFO OOS PF = 0.49.
+    - M1 Pure (6,686 savdo): Gross PF = 0.82, Net PF = 0.60, 1.5x Stress PF = 0.53, Net PnL = -$3,569.91, Max DD = 35.75%, WFO OOS PF = 0.59.
+    - Barcha 5 ta variant (M5 V1-V3, M3 V1, M1 V1) ham Net PF 0.40 – 0.61 atrofida bo'lib, birortasi ham hatto Gross PF 1.0 ga yetmadi.
+  - **Asosiy Sabab:**
+    1. Sof narx darajasida ham (Gross PF 0.53 - 0.82) matematik kutilma manfiy (NO EDGE).
+    2. R:R nomutanosibligi: Dinamik SL o'rtacha 25 - 45 pipni tashkil qilgan holda, TP qat'iy 20 va 30 pip bo'lgani sababli real R:R ko'pincha 0.76 - 0.83 bo'lgan. Ushbu R:R bilan yutish uchun kamida 55-57% winrate talab etiladi, haqiqiy winrate esa atigi ~35% bo'lgan.
+    3. Likvidlik to'lqini davom etishi: 3 ta bullish shamdan keyingi 1 ta bearish FU sham ko'pincha trendning tugashi emas, balki qisqa oraliq pauza bo'lib, keyingi shamlar yana yuqoriga harakatlanib SL ga urilgan.
+
 

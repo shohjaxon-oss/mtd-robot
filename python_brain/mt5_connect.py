@@ -114,7 +114,7 @@ class MT5Connector:
         portable: bool = False,
     ):
         self.path = path
-        self.login = login
+        self.account_login = login
         self.password = password
         self.server = server
         self.timeout_ms = timeout_ms
@@ -123,8 +123,8 @@ class MT5Connector:
 
         if self.password:
             register_secret_to_mask(self.password)
-        if self.login:
-            register_secret_to_mask(str(self.login))
+        if self.account_login:
+            register_secret_to_mask(str(self.account_login))
 
     def connect(self) -> bool:
         """Initialize connection to MT5 terminal."""
@@ -139,12 +139,12 @@ class MT5Connector:
         if self.path:
             init_kwargs["path"] = self.path
 
-        if self.login and self.password and self.server:
-            init_kwargs["login"] = int(self.login)
+        if self.account_login and self.password and self.server:
+            init_kwargs["login"] = int(self.account_login)
             init_kwargs["password"] = self.password
             init_kwargs["server"] = self.server
             app_logger.info(
-                f"Attempting login to account #{self.login} on server '{self.server}'..."
+                f"Attempting login to account #{self.account_login} on server '{self.server}'..."
             )
 
         initialized = mt5.initialize(**init_kwargs)
@@ -267,6 +267,13 @@ class MT5Connector:
             spread_points=spread_points,
             time=int(tick.time),
         )
+
+    def get_symbol_info_tick(self, symbol_name: str) -> Any:
+        """Fetch MT5 symbol_info_tick directly."""
+        if mt5 is not None:
+            return mt5.symbol_info_tick(symbol_name)
+        return self.get_live_tick(symbol_name)
+
 
     def get_symbol_specification(self, symbol_name: str) -> Optional[SymbolSpecification]:
         """Extract complete trading specifications, real swap impact, and contract parameters."""
@@ -418,3 +425,8 @@ class MT5Connector:
             mt5.shutdown()
             self.is_connected = False
             app_logger.info("MT5 connection closed gracefully.")
+
+    def shutdown(self) -> None:
+        """Alias for disconnect()."""
+        self.disconnect()
+
