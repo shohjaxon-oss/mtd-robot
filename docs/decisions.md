@@ -211,3 +211,25 @@ Ushbu hujjatda `mtd-robot` loyihasi bo'yicha qabul qilingan barcha muhim texnik,
 - **Oqibati:**
   Backtest dvigateli va Live ijro arxitekturasi orqaga to'liq mos holda multi-leg va breakeven funksiyalariga ega bo'ldi. Mavjud 87 ta regression testlari 100% yashil qoldi.
 
+---
+
+### ADR-0014: FU-M3 Jonli Ijro Tuzatishlari, Realistik Spread (450 pt) va Demo Data Collection Profili
+- **Sana:** 2026-10-15
+- **Status:** Qabul qilindi
+- **Kontekst:**
+  MTD-ROBOT Exness demo hisobida ishga tushirilganda birorta ham pozitsiya ochmagan edi. Kod auditi quyidagi sabablarni aniqladi:
+  1. `max_spread_points: 40.0` bo'lib qolgan edi. XAUUSD real spreadi odatda 180-260 punkt, p95 280-360 punkt, rolloverda 1600+ punkt. Oqibatda har bir signal `SPREAD_TOO_HIGH` xatosi bilan bloklangan.
+  2. `main.py` da `risk_gate.evaluate(...)` mavjud emas edi (`AttributeError`).
+  3. `ProductionRiskGate` config wiring noto'g'ri bo'lib, `risk_per_trade_pct` ga `max_allowed_risk_per_trade_pct` (1.0%) olingan, drawdown limitlari o'qilmagan.
+  4. `fu_formation.py` strategiyasi `tp_pips` qaytargan, lekin `main.py` `leg.tp` (None) ni yuborgani sababli MT5 ga TP umuman qo'yilmagan.
+  5. Timeframe M3 qulflanmagan va bitta setup qoidasi to'liq tekshirilmagan.
+- **Qaror:**
+  1. **Spread Chegarasi:** `config/risk.yaml` dagi `max_spread_points` 450.0 punktga ko'tarildi (`docs/spread_profile.md` dagi p95 parametrlariga asoslanib).
+  2. **Yagona Evaluate API:** `ProductionRiskGate` ga `evaluate()` metodi qo'shildi va `AccountState` MT5 ning real deal tarixidan (bugungi va haftalik realized PnL) hisoblanadigan `build_account_state()` funksiyasi yaratildi.
+  3. **FU 2-Leg Atomik Ijro va Fill Narxidan TP:** Buyurtma yuborishda so'rov narxidan server-side TP yuboriladi, fill bo'lgach esa haqiqiy fill narxiga nisbatan aniq TP ga `modify_position_sl_tp` qilinadi.
+  4. **Breakeven Trailing:** Leg A TP bilan yopilganda Leg B ning SL i kirish narxiga ko'chiriladi. Leg A SL bilan yopilsa BE ishlamaydi.
+  5. **Demo Data Collection Profili:** Demo hisobda kunlik savdo soni 30 tagacha kengaytirildi, cooldown o'chirildi; lekin kunlik 2% va umumiy 12% kill-switch to'liq faol qoladi. Profil faqat DEMO da ishlaydi, REAL da xato berib to'xtaydi.
+  6. **Ishonchlilik:** 5 soniya kechikish filtri, `stops_level` tekshiruvi, bitta setup qoidasi, alohida oqimdagi heartbeat va diskka state saqlash joriy etildi.
+- **Oqibati:**
+  MTD-ROBOT Exness demo hisobida to'liq avtonom, qat'iy atomik va kuzatiladigan holatga keltirildi. Barcha tekshiruvlar preflight va replay_signals vositalari orqali tasdiqlandi.
+

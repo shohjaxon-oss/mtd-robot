@@ -38,3 +38,8 @@ bridge:
   host: "127.0.0.1"
   heartbeat_interval_seconds: 1.0
   heartbeat_timeout_seconds: 5.0
+
+# QAT'IY STRATEGIYA QOIDASI: FAQAT M3
+strategy:
+  name: "fu_formation"
+  timeframe: "M3"

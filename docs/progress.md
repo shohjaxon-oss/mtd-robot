@@ -1,9 +1,9 @@
 # MTD-ROBOT Loyiha Taraqqiyoti (Progress Tracker)
 
-> **Joriy Bosqich:** 3/10 — Backtest Engine va Xarajat Modeli (Yakunlandi)  
-> **Oxirgi yangilanish:** 2026-10-13  
-> **Broker / Server:** Exness (`Exness-MT5Trial15`), Demo Standard  
-> **Faol Instrument:** `XAUUSDm` (Digits: 3, Point: 0.001)
+> **Joriy Bosqich:** FU-M3 Jonli Demo Savdo Ishga Tushirildi (9/10 Demo Forward-Test)  
+> **Oxirgi yangilanish:** 2026-10-15  
+> **Broker / Server:** Exness / MetaQuotes-Demo  
+> **Faol Instrument:** `XAUUSD` / `XAUUSDm` (Digits: 2/3, Point: 0.001)
 
 ---
 
@@ -15,11 +15,11 @@
 | 2 | **Data layer (Tarixiy ma'lumot, sifat, profil)** | ✅ Yopildi | ✅ O'tdi | M1-D1 ma'lumot Parquet'da, sifat hisoboti, spread modeli |
 | 3 | **Backtest engine va xarajat modeli** | ✅ Yopildi | ✅ O'tdi | Event-driven, A1-A12 audit tuzatishlari, 47/47 test |
 | 4 | **Strategiya tadqiqoti va validatsiya** | ✅ Yopildi | ⚠️ Rad etildi (Halol) | 4 oila sinaldi, xarajatlar ostida edge topilmadi, Holdout qulfda |
-| 5 | **Signal engine, rejim aniqlash, yangilik filtri** | 🔄 Keyingi | Kutilmoqda | Yangi gipotezalar (intraday/short-bias), rejim detektorlari |
-| 6 | **Risk engine (eng muhim modul)** | ✅ Yopildi (Demo) | ✅ O'tdi | SQLite persistent state, kill-switch reset, 12 ta xavfsizlik cheklovi |
-| 7 | **MQL5 EA ijro qatlami va ko'prik** | ✅ Yopildi (Demo) | ✅ O'tdi | Server SL/TP, idempotentlik, DLL-siz MTD_Guardian.mq5 |
-| 8 | **Monitoring, logging, ogohlantirish, testlar** | ✅ Yopildi (Demo) | ✅ O'tdi | LiveRunner, Telegram, Watchdog, Dry-run, 87/87 test |
-| 9 | Demo forward-test (8-12 hafta) | ⏳ Kutilmoqda | - | Qat'iy parametrlarda real bozor tekshiruvi |
+| 5 | **Signal engine, rejim aniqlash, yangilik filtri** | ✅ Yopildi | ✅ O'tdi | FU-Formation (HYP-09 / ADR-0013) qo'shildi |
+| 6 | **Risk engine (eng muhim modul)** | ✅ Yopildi | ✅ O'tdi | SQLite persistent state, kill-switch reset, 12 ta xavfsizlik cheklovi |
+| 7 | **MQL5 EA ijro qatlami va ko'prik** | ✅ Yopildi | ✅ O'tdi | Server SL/TP, idempotentlik, DLL-siz MTD_Guardian.mq5 |
+| 8 | **Monitoring, logging, ogohlantirish, testlar** | ✅ Yopildi | ✅ O'tdi | LiveRunner, Telegram, Watchdog, Dry-run, 87/87 test |
+| 9 | **FU-M3 Demo forward-test (Jonli ijro)** | 🔄 Faol | ✅ Gate O'tdi | Preflight 12/12 PASS, 2-Leg atomik, BE trailing, 114/114 test |
 | 10 | Mikro-live, VPS, masshtablash va operatsiya | ⏳ Kutilmoqda | - | Kichik real kapital, runbook, monitoring |
 
 ---

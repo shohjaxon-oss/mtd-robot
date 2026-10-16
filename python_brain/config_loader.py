@@ -47,12 +47,18 @@ class SafetyConfig(BaseModel):
     allow_live: bool = Field(default=False, description="Strict safety guard: False for Demo only, True for Live")
 
 
+class StrategySettingsConfig(BaseModel):
+    name: str = "fu_formation"
+    timeframe: str = Field(default="M3", pattern="^M3$", description="Strictly locked to M3")
+
+
 class SettingsConfig(BaseModel):
     app: AppConfig
     mt5: MT5SystemConfig
     logging: LoggingConfig
     bridge: BridgeConfig
     safety: SafetyConfig = Field(default_factory=SafetyConfig)
+    strategy: StrategySettingsConfig = Field(default_factory=StrategySettingsConfig)
 
 
 # --------------------------------------------------------------------------
@@ -97,12 +103,12 @@ class DrawdownLimitsConfig(BaseModel):
 
 
 class ExecutionLimitsConfig(BaseModel):
-    max_open_positions: int = Field(default=1, ge=1, le=3)
-    max_daily_trades: int = Field(default=5, ge=1, le=20)
+    max_open_positions: int = Field(default=2, ge=1, le=10)
+    max_daily_trades: int = Field(default=5, ge=1, le=50)
     consecutive_losses_cooldown_trades: int = Field(default=3, ge=1)
-    cooldown_duration_minutes: int = Field(default=60, ge=5)
-    max_spread_points: float = Field(default=40.0, gt=0.0)
-    min_risk_reward_ratio: float = Field(default=1.5, ge=1.0)
+    cooldown_duration_minutes: int = Field(default=60, ge=0)
+    max_spread_points: float = Field(default=450.0, gt=0.0)
+    min_risk_reward_ratio: float = Field(default=0.5, ge=0.1)
 
 
 class ForbiddenMechanicsConfig(BaseModel):

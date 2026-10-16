@@ -49,13 +49,15 @@ RETCODE_MAP = {
     10009: "Order executed (Done)",
     10014: "Invalid volume",
     10015: "Invalid price",
-    10016: "Invalid stops (SL/TP)",
+    10016: "Invalid stops (SL/TP): SL/TP narxi joriy bozor narxiga juda yaqin yoki broker stops_level ichida",
     10017: "Trade disabled",
     10018: "Market closed",
     10019: "No money / Margin exceeded",
     10020: "Price changed",
     10021: "No quotes / Off quotes",
     10024: "Timeout",
+    10027: "AutoTrading disabled by client terminal! Yoqish uchun: MT5 -> Tools -> Options -> Expert Advisors -> 'Allow Algo Trading' ni yoqing",
+    10030: "Unsupported filling mode! Broker ushbu filling rejimini qo'llab-quvvatlamaydi",
 }
 
 
@@ -142,6 +144,22 @@ class MT5BrokerExecutor:
         logger.info(f"Reconciliation yakunlandi: {len(bot_positions)} ta ochiq pozitsiya topildi (Magic: {self.magic_number}).")
         return bot_positions
 
+    def get_filling_mode(self) -> int:
+        """Broker simvoli bo'yicha ruxsat etilgan filling mode ni dinamik aniqlaydi."""
+        if self._mt5 is None or not hasattr(self._mt5, "symbol_info"):
+            return 1
+        sym_info = self._mt5.symbol_info(self.symbol)
+        if sym_info is None:
+            return 1
+        modes = getattr(sym_info, "filling_mode", 0)
+        # SYMBOL_FILLING_IOC = 2 -> ORDER_FILLING_IOC = 1
+        # SYMBOL_FILLING_FOK = 1 -> ORDER_FILLING_FOK = 0
+        if modes & 2:
+            return 1  # ORDER_FILLING_IOC
+        elif modes & 1:
+            return 0  # ORDER_FILLING_FOK
+        return 2  # ORDER_FILLING_RETURN
+
     def has_duplicate_order(self, comment_tag: str) -> bool:
         """Idempotentlik tekshiruvi: shu magic yoki comment bilan pozitsiya bormi?"""
         self._ensure_connected()
@@ -188,6 +206,7 @@ class MT5BrokerExecutor:
         req_price = tick.ask if is_buy else tick.bid
         order_type_mt5 = 0 if is_buy else 1  # 0 = ORDER_TYPE_BUY, 1 = ORDER_TYPE_SELL
         dev = deviation_pts if deviation_pts is not None else self.default_deviation_pts
+        filling_type = self.get_filling_mode()
 
         request = {
             "action": 1,  # TRADE_ACTION_DEAL
@@ -201,7 +220,7 @@ class MT5BrokerExecutor:
             "magic": int(self.magic_number),
             "comment": comment,
             "type_time": 0,  # ORDER_TIME_GTC
-            "type_filling": 1,  # ORDER_FILLING_IOC (yoki broker turiga mos)
+            "type_filling": filling_type,
         }
 
         # Cheklangan qayta urinish (Retry)
@@ -223,6 +242,23 @@ class MT5BrokerExecutor:
 
             if result is None:
                 logger.error(f"order_send natijasi None qaytdi (no response from MT5 terminal)")
+                # Qayta urinishdan oldin brokerda allaqachon ochilganini tekshiramiz (dublikat bo'lmasligi uchun)
+                existing_positions = self._mt5.positions_get(symbol=self.symbol)
+                if existing_positions:
+                    for p in existing_positions:
+                        if getattr(p, "magic", 0) == self.magic_number and comment in getattr(p, "comment", ""):
+                            logger.success(f"Buyurtma aslida terminalda ochilgani aniqlandi! Ticket #{p.ticket}")
+                            return ExecutionResult(
+                                success=True,
+                                retcode=RETCODE_DONE,
+                                comment="EXECUTED_CONFIRMED_ON_RECONCILE",
+                                ticket=p.ticket,
+                                volume=p.volume,
+                                requested_price=req_price,
+                                fill_price=p.price_open,
+                                order_type=side_str,
+                                time_utc=datetime.now(timezone.utc),
+                            )
                 time.sleep(self.retry_delay_seconds)
                 continue
 
@@ -254,6 +290,26 @@ class MT5BrokerExecutor:
                     time_utc=datetime.now(timezone.utc),
                 )
 
+            # Timeout holatida ham qayta urinishdan oldin pozitsiyalarni tekshirish
+            if retcode == RETCODE_TIMEOUT:
+                logger.warning(f"Timeout ({retcode}). Qayta urinishdan oldin pozitsiyalar tekshirilmoqda...")
+                existing_positions = self._mt5.positions_get(symbol=self.symbol)
+                if existing_positions:
+                    for p in existing_positions:
+                        if getattr(p, "magic", 0) == self.magic_number and comment in getattr(p, "comment", ""):
+                            logger.success(f"Timeoutdan so'ng buyurtma terminalda topildi! Ticket #{p.ticket}")
+                            return ExecutionResult(
+                                success=True,
+                                retcode=RETCODE_DONE,
+                                comment="EXECUTED_CONFIRMED_AFTER_TIMEOUT",
+                                ticket=p.ticket,
+                                volume=p.volume,
+                                requested_price=req_price,
+                                fill_price=p.price_open,
+                                order_type=side_str,
+                                time_utc=datetime.now(timezone.utc),
+                            )
+
             # Requote yoki Narx o'zgargan bo'lsa yangi narx bilan qayta urinish
             if retcode in [RETCODE_REQUOTE, RETCODE_PRICE_CHANGED]:
                 logger.warning(f"Requote/PriceChanged ({retcode}). Yangi narx yangilanmoqda...")
@@ -264,9 +320,10 @@ class MT5BrokerExecutor:
                 time.sleep(self.retry_delay_seconds)
                 continue
 
-            # Agar qat'iy xatolar bo'lsa (mablag' yetarli emas, bozor yopiq, savdo taqiqlangan) - qayta urinilmaydi
-            if retcode in [RETCODE_NO_MONEY, RETCODE_MARKET_CLOSED, RETCODE_TRADE_DISABLED]:
-                logger.error(f"Tiklanmaydigan broker xatosi: {retcode} ({result.comment})")
+            # Agar qat'iy xatolar bo'lsa (mablag' yetarli emas, bozor yopiq, savdo taqiqlangan, invalid stops, autotrading disabled)
+            if retcode in [RETCODE_NO_MONEY, RETCODE_MARKET_CLOSED, RETCODE_TRADE_DISABLED, 10016, 10027, 10030]:
+                mapped = RETCODE_MAP.get(retcode, result.comment)
+                logger.error(f"Tiklanmaydigan broker xatosi: retcode={retcode} -> {mapped}")
                 break
 
             time.sleep(self.retry_delay_seconds)
@@ -336,7 +393,7 @@ class MT5BrokerExecutor:
             "magic": int(self.magic_number),
             "comment": f"Close_{ticket}",
             "type_time": 0,
-            "type_filling": 1,
+            "type_filling": self.get_filling_mode(),
         }
 
         res = self._mt5.order_send(request)
@@ -374,8 +431,8 @@ class MT5BrokerExecutor:
         }
 
         res = self._mt5.order_send(request)
-        if res and res.retcode in [RETCODE_DONE, RETCODE_PLACED]:
-            logger.success(f"Pozitsiya #{ticket} SL/TP yangilandi: SL={sl}, TP={current_tp}")
+        if res and res.retcode in [RETCODE_DONE, RETCODE_PLACED, 10025]:
+            logger.success(f"Pozitsiya #{ticket} SL/TP yangilandi: SL={sl}, TP={current_tp} (retcode={res.retcode})")
             return ExecutionResult(
                 success=True,
                 retcode=res.retcode,
